@@ -22,6 +22,10 @@ export async function POST(request: NextRequest) {
           finishedAt: status === 'done' ? new Date() : undefined,
         },
       });
+      // Award XP for completing a session
+      if (status === 'done') {
+        await prisma.user.update({ where: { id: payload.userId }, data: { xp: { increment: 50 } } });
+      }
       return NextResponse.json({ success: true, session: updated });
     }
 
@@ -42,6 +46,11 @@ export async function POST(request: NextRequest) {
         startedAt: new Date(),
       },
     });
+
+    // Award XP for completing a session (direct creation with done status)
+    if (status === 'done') {
+      await prisma.user.update({ where: { id: payload.userId }, data: { xp: { increment: 50 } } });
+    }
 
     return NextResponse.json({ success: true, session });
   } catch (error) {

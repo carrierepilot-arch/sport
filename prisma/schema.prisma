@@ -16,7 +16,10 @@ model User {
   isAdmin   Boolean  @default(false)
   suspended Boolean  @default(false)
   level     String   @default("intermediaire")
-  createdAt DateTime @default(now())
+  xp            Int      @default(0)
+  equipmentData Json?
+  physicalData  Json?    // Array of { date, weight, height, bodyFat, chest, waist, hips, bicepsL, bicepsR, thighL, thighR }
+  createdAt     DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   sentFriendRequests     FriendRequest[] @relation("SentRequests")
@@ -175,10 +178,12 @@ model Challenge {
   badgeCode          String    @default("")
   badgeLabel         String    @default("")
   creatorId          String?
+  visibility         String    @default("friends") // "friends" | "private" | "public"
   isPublic           Boolean   @default(false)
   submittedForReview Boolean   @default(false)
   adminApproved      Boolean   @default(false)
   challengeType      String    @default("simple")
+  difficulty         Int       @default(1)
   circuitData        Json?
   createdAt          DateTime  @default(now())
 

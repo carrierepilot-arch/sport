@@ -8,8 +8,8 @@ type UserLevel = 'debutant' | 'intermediaire' | 'elite';
 type TempsSeance = '30min' | '1h' | '1h30' | '2h' | '';
 type DureeProgramme = '1_semaine' | '2_semaines' | '1_mois' | '2_mois' | '3_mois' | '';
 type Lieu = 'Salle de sport' | 'Maison' | 'Street workout' | '';
-type Equipement = 'Ceinture lestee' | 'Gilet leste';
-interface EquipementConfig { maxKg: number; progression: string }
+type Equipement = 'Ceinture lestee' | 'Gilet leste' | 'Elastiques' | 'Halteres' | 'Barre de traction' | 'Parallettes' | 'Anneaux' | 'Autre';
+interface EquipementConfig { maxKg: number; progression: string; detail?: string }
 
 type Figure = 'Front lever' | 'Back lever' | 'Handstand' | 'Drapeau' | 'Planche' | 'Muscle up statique';
 type Muscle = 'Pectoraux' | 'Dos' | 'Epaules' | 'Biceps' | 'Triceps' | 'Abdominaux' | 'Jambes';
@@ -606,6 +606,7 @@ interface SavedWorkout {
 export default function EntrainementPage() {
   // Config state
   const [userLevel, setUserLevel] = useState<UserLevel | ''>('');
+  const [userXp, setUserXp] = useState(0);
   const [objectifs, setObjectifs] = useState<Objectif[]>([]);
   const [tempsSeance, setTempsSeance] = useState<TempsSeance>('');
   const [dureeProgramme, setDureeProgramme] = useState<DureeProgramme>('');
@@ -616,9 +617,15 @@ export default function EntrainementPage() {
   const [joursSelectes, setJoursSelectes] = useState<string[]>([]);
   const [lieu, setLieu] = useState<Lieu>('');
   const [equipements, setEquipements] = useState<Equipement[]>([]);
-  const [equipConfig, setEquipConfig] = useState<Record<Equipement, EquipementConfig>>({
+  const [equipConfig, setEquipConfig] = useState<Record<string, EquipementConfig>>({
     'Ceinture lestee': { maxKg: 10, progression: '+1 kg' },
     'Gilet leste': { maxKg: 10, progression: '+1 kg' },
+    'Elastiques': { maxKg: 0, progression: '', detail: '' },
+    'Halteres': { maxKg: 20, progression: '+2 kg' },
+    'Barre de traction': { maxKg: 0, progression: '' },
+    'Parallettes': { maxKg: 0, progression: '' },
+    'Anneaux': { maxKg: 0, progression: '' },
+    'Autre': { maxKg: 0, progression: '', detail: '' },
   });
 
   // Generation state
@@ -636,7 +643,7 @@ export default function EntrainementPage() {
   const [shareSent, setShareSent] = useState(false);
   const [shareWorkoutId, setShareWorkoutId] = useState<string | null>(null);
   const [creationMode, setCreationMode] = useState(false);
-  const [entrainementTab, setEntrainementTab] = useState<'config' | 'seances' | 'defis'>('config');
+  const [entrainementTab, setEntrainementTab] = useState<'config' | 'seances' | 'defis' | 'equipement'>('config');
   // ── Défis de la semaine ──
   const [challenges, setChallenges] = useState<{
     id: string; title: string; description: string;
@@ -647,6 +654,7 @@ export default function EntrainementPage() {
     creator?: { id: string; pseudo: string | null; name: string | null } | null;
     submittedForReview?: boolean;
     challengeType?: string;
+    difficulty?: number;
     circuitData?: { exercises: { nom: string; reps: number }[]; repos: number; tours: number } | null;
   }[]>([]);
   const [challengeLoading, setChallengeLoading] = useState(false);
@@ -659,6 +667,8 @@ export default function EntrainementPage() {
   const [newChallTarget, setNewChallTarget] = useState('');
   const [newChallUnit, setNewChallUnit] = useState('reps');
   const [newChallType, setNewChallType] = useState<'simple' | 'circuit'>('simple');
+  const [newChallDifficulty, setNewChallDifficulty] = useState<1 | 2 | 3>(1);
+  const [newChallVisibility, setNewChallVisibility] = useState<'friends' | 'private' | 'public'>('friends');
   const [circuitExercises, setCircuitExercises] = useState<{ nom: string; reps: number }[]>([{ nom: '', reps: 10 }]);
   const [circuitRepos, setCircuitRepos] = useState(120);
   const [circuitTours, setCircuitTours] = useState(3);
@@ -680,11 +690,17 @@ export default function EntrainementPage() {
 
   // Toggles
   const toggleJour = (j: string) => setJoursSelectes((p) => p.includes(j) ? p.filter((x) => x !== j) : [...p, j]);
-  const toggleEquip = (e: Equipement) => setEquipements((p) => p.includes(e) ? p.filter((x) => x !== e) : [...p, e]);
+  const toggleEquip = (e: Equipement) => {
+    setEquipements((p) => {
+      const nv = p.includes(e) ? p.filter((x) => x !== e) : [...p, e];
+      saveEquipment(nv, equipConfig);
+      return nv;
+    });
+  };
   const updateEquipKg = (eq: Equipement, val: number) =>
-    setEquipConfig((p) => ({ ...p, [eq]: { ...p[eq], maxKg: val } }));
+    setEquipConfig((p) => { const nv = { ...p, [eq]: { ...p[eq], maxKg: val } }; saveEquipment(equipements, nv); return nv; });
   const updateEquipProg = (eq: Equipement, val: string) =>
-    setEquipConfig((p) => ({ ...p, [eq]: { ...p[eq], progression: val } }));
+    setEquipConfig((p) => { const nv = { ...p, [eq]: { ...p[eq], progression: val } }; saveEquipment(equipements, nv); return nv; });
   const toggleObjectif = (o: Objectif) =>
     setObjectifs((p) => p.includes(o) ? p.filter((x) => x !== o) : [...p, o]);
 
@@ -750,10 +766,39 @@ export default function EntrainementPage() {
       if (!res.ok) return;
       const data = await res.json();
       if (data.user?.level) setUserLevel(data.user.level as UserLevel);
+      if (data.user?.xp != null) setUserXp(data.user.xp);
     } catch { /* silencieux */ }
   }, []);
 
-  useEffect(() => { loadSavedWorkouts(); loadAmis(); loadUserLevel(); }, [loadSavedWorkouts, loadAmis, loadUserLevel]);
+  // Charger l'équipement depuis la DB
+  const loadEquipment = useCallback(async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    try {
+      const res = await fetch('/api/user/equipment', { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.equipmentData) {
+        if (data.equipmentData.equipements) setEquipements(data.equipmentData.equipements);
+        if (data.equipmentData.equipConfig) setEquipConfig((prev) => ({ ...prev, ...data.equipmentData.equipConfig }));
+      }
+    } catch { /* silencieux */ }
+  }, []);
+
+  // Sauvegarder l'équipement dans la DB
+  const saveEquipment = useCallback(async (eqs: string[], conf: Record<string, any>) => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    try {
+      await fetch('/api/user/equipment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ equipmentData: { equipements: eqs, equipConfig: conf } }),
+      });
+    } catch { /* silencieux */ }
+  }, []);
+
+  useEffect(() => { loadSavedWorkouts(); loadAmis(); loadUserLevel(); loadEquipment(); }, [loadSavedWorkouts, loadAmis, loadUserLevel, loadEquipment]);
 
   // ── Défis callbacks ──
   const loadChallenges = useCallback(async () => {
@@ -788,6 +833,7 @@ export default function EntrainementPage() {
         const msg = data.badgeLabel ? `🏅 Badge « ${data.badgeLabel} » obtenu !` : '✓ Défi relevé !';
         setChallengeNotif((prev) => ({ ...prev, [id]: msg }));
         await loadChallenges();
+        loadUserLevel(); // reload XP
       } else {
         setChallengeNotif((prev) => ({ ...prev, [id]: data.error ?? 'Erreur' }));
       }
@@ -807,7 +853,7 @@ export default function EntrainementPage() {
       const token = localStorage.getItem('token');
       const bodyData: Record<string, unknown> = {
         action: 'create', title: newChallTitle, description: newChallDesc,
-        challengeType: newChallType,
+        challengeType: newChallType, difficulty: newChallDifficulty, visibility: newChallVisibility,
       };
       if (newChallType === 'circuit') {
         bodyData.exercise = 'circuit';
@@ -827,11 +873,11 @@ export default function EntrainementPage() {
       if (res.ok) {
         setShowCreateChallenge(false);
         setNewChallTitle(''); setNewChallDesc(''); setNewChallExercise(''); setNewChallTarget(''); setNewChallUnit('reps');
-        setNewChallType('simple'); setCircuitExercises([{ nom: '', reps: 10 }]); setCircuitRepos(120); setCircuitTours(3);
+        setNewChallType('simple'); setNewChallDifficulty(1); setNewChallVisibility('friends'); setCircuitExercises([{ nom: '', reps: 10 }]); setCircuitRepos(120); setCircuitTours(3);
         await loadChallenges();
       }
     } finally { setCreateChallengeLoading(false); }
-  }, [newChallTitle, newChallDesc, newChallExercise, newChallTarget, newChallUnit, newChallType, circuitExercises, circuitRepos, circuitTours, loadChallenges]);
+  }, [newChallTitle, newChallDesc, newChallExercise, newChallTarget, newChallUnit, newChallType, newChallDifficulty, newChallVisibility, circuitExercises, circuitRepos, circuitTours, loadChallenges]);
 
   const submitChallenge = useCallback(async (challengeId: string) => {
     const token = localStorage.getItem('token');
@@ -944,6 +990,7 @@ export default function EntrainementPage() {
     });
     setActiveSession(null);
     await loadSavedWorkouts();
+    loadUserLevel(); // reload XP
   };
 
   // Valider une séance sans l'exécuter interactivement
@@ -955,6 +1002,7 @@ export default function EntrainementPage() {
       body: JSON.stringify({ workoutId, dayLabel, status: 'done', results: null }),
     });
     await loadSavedWorkouts();
+    loadUserLevel(); // reload XP
   };
 
   const handleShare = (workoutId?: string) => { setShareOpen(true); setShareTarget(null); setShareSent(false); setShareSearch(''); setShareWorkoutId(workoutId ?? null); };
@@ -1065,12 +1113,24 @@ export default function EntrainementPage() {
       <div className="mb-5 sm:mb-6">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Entrainement</h1>
         <p className="text-sm text-gray-500 mt-1">Configurez votre programme et suivez vos performances.</p>
+        {/* XP display */}
+        <div className="mt-3 flex items-center gap-3">
+          <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-1.5">
+            <span className="text-sm">⚡</span>
+            <span className="text-sm font-bold text-amber-700">{userXp} XP</span>
+          </div>
+          <div className="flex-1 bg-gray-100 rounded-full h-2 max-w-[200px]">
+            <div className="bg-amber-500 h-2 rounded-full transition-all" style={{ width: `${Math.min(100, (userXp % 500) / 5)}%` }} />
+          </div>
+          <span className="text-xs text-gray-400">Palier {Math.floor(userXp / 500) + 1}</span>
+        </div>
       </div>
 
       {/* Sub-tabs */}
       <div className="flex gap-0.5 sm:gap-1 bg-gray-100 p-1 rounded-xl w-full sm:w-fit mb-5 sm:mb-6 overflow-x-auto">
         {([
           { key: 'config' as const, label: 'Générateur' },
+          { key: 'equipement' as const, label: '🏋️ Équipement' },
           { key: 'seances' as const, label: `Mes séances${savedWorkouts.length > 0 ? ` (${savedWorkouts.length})` : ''}` },
           { key: 'defis' as const, label: '🏆 Défis' },
         ]).map((t) => (
@@ -1088,17 +1148,42 @@ export default function EntrainementPage() {
 
         {/* ── TEST DE NIVEAU (en haut) ── */}
         {!testSkipped && (
-          <Section title="Test de niveau" subtitle="Évaluez vos capacités en endurance, force ou mouvements statiques.">
+          <section className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl border-2 border-emerald-200 p-6 sm:p-8 shadow-sm">
+            <div className="flex items-center gap-3 mb-2">
+              <span className="text-3xl">🎯</span>
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Test de niveau</h2>
+                <p className="text-sm text-gray-600">Évaluez vos capacités pour générer des séances parfaitement adaptées à votre niveau.</p>
+              </div>
+            </div>
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 mb-4 flex items-center gap-2">
+              <span className="text-base">⚠️</span>
+              <p className="text-sm text-amber-800 font-medium">Il est recommandé de passer ce test pour des séances personnalisées et optimales.</p>
+            </div>
             <TestNiveau />
-            <div className="mt-3 text-center">
+            <div className="mt-4 text-center">
               <button
                 onClick={() => setTestSkipped(true)}
                 className="text-xs text-gray-400 hover:text-gray-600 underline transition"
               >
-                Passer le test →
+                Passer le test pour l&apos;instant →
               </button>
             </div>
-          </Section>
+          </section>
+        )}
+        {testSkipped && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-base">⚠️</span>
+              <p className="text-sm text-amber-800">Vous n&apos;avez pas passé le test de niveau. Vos séances seront moins personnalisées.</p>
+            </div>
+            <button
+              onClick={() => setTestSkipped(false)}
+              className="text-xs font-semibold text-emerald-700 hover:text-emerald-500 underline transition shrink-0 ml-3"
+            >
+              Passer le test
+            </button>
+          </div>
         )}
 
         {/* ── 0. NIVEAU UTILISATEUR ── */}
@@ -1348,66 +1433,6 @@ export default function EntrainementPage() {
             ))}
           </div>
         </Section>
-
-        {/* ── 6. EQUIPEMENT — masqué pour débutants ── */}
-        {userLevel !== 'debutant' && (
-        <Section title="Equipement et progression" subtitle="Quel equipement utilises-tu ?">
-          <div className="space-y-3">
-            {(['Ceinture lestee', 'Gilet leste'] as Equipement[]).map((eq) => (
-              <div key={eq}>
-                <button
-                  onClick={() => toggleEquip(eq)}
-                  className={`w-full flex items-center justify-between px-5 py-4 rounded-xl border-2 text-sm font-semibold transition ${
-                    equipements.includes(eq)
-                      ? 'border-emerald-500 bg-emerald-500 text-white'
-                      : 'border-gray-200 text-gray-600 hover:border-gray-400 bg-white'
-                  }`}
-                >
-                  <span>{eq}</span>
-                  <span className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
-                    equipements.includes(eq) ? 'border-white bg-white/20' : 'border-gray-300'
-                  }`}>
-                    {equipements.includes(eq) && (
-                      <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 10 10">
-                        <path d="M1.5 5l2.5 2.5 4.5-4.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    )}
-                  </span>
-                </button>
-
-                {equipements.includes(eq) && (
-                  <div className="mt-2 ml-3 border border-emerald-200 bg-emerald-50 rounded-xl p-5 space-y-5">
-                    <div>
-                      <p className="text-sm font-medium text-gray-700 mb-2">Charge maximale</p>
-                      <div className="flex items-center gap-4">
-                        <input
-                          type="range" min={0} max={80} step={0.5}
-                          value={equipConfig[eq].maxKg}
-                          onChange={(e) => updateEquipKg(eq, Number(e.target.value))}
-                          className="flex-1 accent-emerald-500"
-                        />
-                        <span className="w-16 text-right text-sm font-bold text-emerald-800 tabular-nums">
-                          {equipConfig[eq].maxKg} kg
-                        </span>
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-700 mb-2">Progression par palier</p>
-                      <input
-                        type="text"
-                        value={equipConfig[eq].progression}
-                        onChange={(e) => updateEquipProg(eq, e.target.value)}
-                        placeholder="ex: +2 kg, +5 kg..."
-                        className="w-full px-4 py-2.5 rounded-lg border border-emerald-300 text-sm text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </Section>
-        )}
 
         {/* ── 7. GENERATEUR ── */}
         <Section title="Generateur d'entrainement" subtitle="Generez, modifiez ou creez un programme.">
@@ -1715,7 +1740,7 @@ export default function EntrainementPage() {
                     ['Fréquence', `${frequence}x / semaine`],
                     ['Jours', joursSelectes.length ? joursSelectes.join(', ') : '--'],
                     ['Lieu', lieu || '--'],
-                    ['Équipement', equipements.length ? equipements.map((e) => `${e} · max ${equipConfig[e].maxKg} kg · ${equipConfig[e].progression}`).join(' | ') : '--'],
+                    ['Équipement', equipements.length ? equipements.join(', ') : '--'],
                   ].map(([l, v]) => (
                     <tr key={l}>
                       <td className="text-gray-400 pr-6 w-28 py-0.5">{l}</td>
@@ -1978,6 +2003,77 @@ export default function EntrainementPage() {
 
         </>)} {/* ── end tab séances (analyse) ── */}
 
+        {/* ═══════ TAB: ÉQUIPEMENT ═══════ */}
+        {entrainementTab === 'equipement' && (
+          <section className="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 shadow-sm">
+            <div className="flex items-center gap-3 mb-6">
+              <span className="text-3xl">🏋️</span>
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Équipement disponible</h2>
+                <p className="text-sm text-gray-500">Sélectionnez votre matériel pour des séances adaptées. Sauvegardé automatiquement.</p>
+              </div>
+            </div>
+            <div className="space-y-3">
+              {(['Ceinture lestee', 'Gilet leste', 'Elastiques', 'Halteres', 'Barre de traction', 'Parallettes', 'Anneaux', 'Autre'] as Equipement[]).map((eq) => {
+                const needsKg = ['Ceinture lestee', 'Gilet leste', 'Halteres'].includes(eq);
+                const needsDetail = ['Elastiques', 'Autre'].includes(eq);
+                const icon = eq === 'Ceinture lestee' ? '🏋️' : eq === 'Gilet leste' ? '🦺' : eq === 'Elastiques' ? '🔗' : eq === 'Halteres' ? '💪' : eq === 'Barre de traction' ? '🔩' : eq === 'Parallettes' ? '🤸' : eq === 'Anneaux' ? '⭕' : '📦';
+                return (
+                <div key={eq}>
+                  <button
+                    onClick={() => toggleEquip(eq)}
+                    className={`w-full flex items-center justify-between px-5 py-4 rounded-xl border-2 text-sm font-semibold transition ${
+                      equipements.includes(eq)
+                        ? 'border-emerald-500 bg-emerald-500 text-white'
+                        : 'border-gray-200 text-gray-600 hover:border-gray-400 bg-white'
+                    }`}
+                  >
+                    <span>{icon} {eq}</span>
+                    <span className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
+                      equipements.includes(eq) ? 'border-white bg-white/20' : 'border-gray-300'
+                    }`}>
+                      {equipements.includes(eq) && (
+                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 10 10">
+                          <path d="M1.5 5l2.5 2.5 4.5-4.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      )}
+                    </span>
+                  </button>
+                  {equipements.includes(eq) && (
+                    <div className="mt-2 ml-3 border border-emerald-200 bg-emerald-50 rounded-xl p-5 space-y-4">
+                      {needsKg && (
+                        <div>
+                          <p className="text-sm font-medium text-gray-700 mb-2">Charge maximale</p>
+                          <div className="flex items-center gap-4">
+                            <input type="range" min={0} max={80} step={0.5} value={equipConfig[eq]?.maxKg ?? 0} onChange={(e) => updateEquipKg(eq, Number(e.target.value))} className="flex-1 accent-emerald-500" />
+                            <span className="w-16 text-right text-sm font-bold text-emerald-800 tabular-nums">{equipConfig[eq]?.maxKg ?? 0} kg</span>
+                          </div>
+                        </div>
+                      )}
+                      {needsKg && (
+                        <div>
+                          <p className="text-sm font-medium text-gray-700 mb-2">Progression par palier</p>
+                          <input type="text" value={equipConfig[eq]?.progression ?? ''} onChange={(e) => updateEquipProg(eq, e.target.value)} placeholder="ex: +2 kg, +5 kg..." className="w-full px-4 py-2.5 rounded-lg border border-emerald-300 text-sm text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none" />
+                        </div>
+                      )}
+                      {needsDetail && (
+                        <div>
+                          <p className="text-sm font-medium text-gray-700 mb-2">{eq === 'Elastiques' ? 'Résistance disponible (ex: légère, moyenne, forte)' : 'Précisez votre équipement'}</p>
+                          <input type="text" value={equipConfig[eq]?.detail ?? ''} onChange={(e) => setEquipConfig((p) => { const nv = { ...p, [eq]: { ...p[eq], detail: e.target.value } }; saveEquipment(equipements, nv); return nv; })} placeholder={eq === 'Elastiques' ? 'ex: légère (5kg), moyenne (15kg), forte (25kg)' : 'ex: kettlebell 16kg, TRX...'} className="w-full px-4 py-2.5 rounded-lg border border-emerald-300 text-sm text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none" />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                );
+              })}
+            </div>
+            <div className="mt-6 p-4 bg-gray-50 rounded-xl">
+              <p className="text-xs text-gray-500"><strong>{equipements.length}</strong> équipement{equipements.length !== 1 ? 's' : ''} sélectionné{equipements.length !== 1 ? 's' : ''}</p>
+            </div>
+          </section>
+        )}
+
         {/* ═══════ TAB: DÉFIS ═══════ */}
         {entrainementTab === 'defis' && (
           <div className="space-y-4">
@@ -1998,7 +2094,20 @@ export default function EntrainementPage() {
             {/* Create challenge form */}
             {showCreateChallenge && (
               <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5 space-y-3">
-                <p className="text-sm font-semibold text-gray-800">Nouveau défi (visible par vos amis)</p>
+                <p className="text-sm font-semibold text-gray-800">Nouveau défi</p>
+
+                {/* Visibility selector */}
+                <div>
+                  <p className="text-xs text-gray-500 font-medium mb-1">Visibilité</p>
+                  <div className="flex gap-2">
+                    {([{ key: 'friends' as const, label: '👥 Amis', desc: 'Vos amis' }, { key: 'private' as const, label: '🔒 Privé', desc: 'Vous seul' }, { key: 'public' as const, label: '🌍 Public', desc: 'Tout le monde' }]).map((v) => (
+                      <button key={v.key} onClick={() => setNewChallVisibility(v.key)}
+                        className={`flex-1 py-2 rounded-lg text-xs font-semibold transition border-2 ${newChallVisibility === v.key ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 text-gray-600 hover:border-gray-400'}`}>
+                        {v.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
                 {/* Type selector */}
                 <div className="flex gap-2">
@@ -2010,6 +2119,19 @@ export default function EntrainementPage() {
                     className={`flex-1 py-2 rounded-lg text-xs font-semibold transition border-2 ${newChallType === 'circuit' ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 text-gray-600 hover:border-gray-400'}`}>
                     🔁 Défi circuit
                   </button>
+                </div>
+
+                {/* Difficulty selector */}
+                <div>
+                  <p className="text-xs text-gray-500 font-medium mb-1">Difficulté</p>
+                  <div className="flex gap-2">
+                    {([1, 2, 3] as const).map((d) => (
+                      <button key={d} onClick={() => setNewChallDifficulty(d)}
+                        className={`flex-1 py-2 rounded-lg text-xs font-semibold transition border-2 ${newChallDifficulty === d ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 text-gray-600 hover:border-gray-400'}`}>
+                        {'⭐'.repeat(d)} {d === 1 ? 'Facile' : d === 2 ? 'Moyen' : 'Difficile'} ({d === 1 ? '25' : d === 2 ? '50' : '100'} XP)
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <input
@@ -2123,6 +2245,7 @@ export default function EntrainementPage() {
                           <div className="flex items-center gap-2 mb-1">
                             <span className="text-base">🏅</span>
                             <h3 className="text-sm font-bold text-gray-900">{c.title}</h3>
+                            <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-semibold">{'⭐'.repeat(c.difficulty || 1)}</span>
                           </div>
                           <p className="text-sm text-gray-600 mb-1">{c.description}</p>
                           <p className="text-xs text-gray-400">
@@ -2165,6 +2288,7 @@ export default function EntrainementPage() {
                             <span className="text-base">{c.challengeType === 'circuit' ? '🔁' : '🎯'}</span>
                             <h3 className="text-sm font-bold text-gray-900">{c.title}</h3>
                             {c.challengeType === 'circuit' && <span className="text-[10px] bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded-full font-semibold">Circuit</span>}
+                            <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-semibold">{'⭐'.repeat(c.difficulty || 1)}</span>
                           </div>
                           {c.creator && (
                             <p className="text-xs text-gray-400 mb-1">Défi créé par <span className="font-semibold text-gray-600">{c.creator.name || c.creator.pseudo}</span></p>

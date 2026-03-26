@@ -91,10 +91,15 @@ export async function GET(request: NextRequest) {
           _count: { select: { completions: true } },
         },
       }),
-      // User-created challenges (own + friends')
+      // User-created challenges (own + friends' visible + public)
       prisma.challenge.findMany({
         where: {
-          creatorId: { in: [payload.userId, ...friendIds] },
+          OR: [
+            // My own challenges (any visibility)
+            { creatorId: payload.userId },
+            // Friends' challenges with visibility 'friends' or 'public'
+            { creatorId: { in: friendIds }, visibility: { in: ['friends', 'public'] } },
+          ],
         },
         include: {
           creator: { select: { id: true, pseudo: true, name: true } },
@@ -168,6 +173,14 @@ export async function POST(request: NextRequest) {
         data: { userId: payload.userId, challengeId },
       });
 
+      // Award XP based on challenge difficulty (1=25, 2=50, 3=100)
+      // Creator never earns XP on their own challenge
+      const isCreator = challenge.creatorId === payload.userId;
+      const xpReward = isCreator ? 0 : (challenge.difficulty === 3 ? 100 : challenge.difficulty === 2 ? 50 : 25);
+      if (xpReward > 0) {
+        await prisma.user.update({ where: { id: payload.userId }, data: { xp: { increment: xpReward } } });
+      }
+
       // Award badge only for system challenges with a badgeCode
       if (challenge.badgeCode) {
         await prisma.badge.upsert({
@@ -186,9 +199,10 @@ export async function POST(request: NextRequest) {
 
     // ── Create a custom challenge ──
     if (action === 'create') {
-      const { title, description, exercise, target, unit, challengeType, circuitData } = body as {
+      const { title, description, exercise, target, unit, challengeType, circuitData, difficulty, visibility } = body as {
         title: string; description: string; exercise: string; target: number; unit: string;
         challengeType?: string; circuitData?: { exercises: { nom: string; reps: number }[]; repos: number; tours: number };
+        difficulty?: number; visibility?: string;
       };
       if (!title || !description) {
         return NextResponse.json({ error: 'Champs manquants' }, { status: 400 });
@@ -214,7 +228,9 @@ export async function POST(request: NextRequest) {
           badgeLabel: '',
           creatorId: payload.userId,
           isPublic: false,
+          visibility: ['friends', 'private', 'public'].includes(visibility || '') ? visibility! : 'friends',
           challengeType: challengeType || 'simple',
+          difficulty: Math.min(3, Math.max(1, Number(difficulty) || 1)),
           circuitData: circuitData ? (circuitData as object) : undefined,
         },
         include: { creator: { select: { id: true, pseudo: true, name: true } } },

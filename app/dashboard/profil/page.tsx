@@ -19,17 +19,46 @@ interface AllBadgeDef {
 }
 
 const ALL_BADGES: AllBadgeDef[] = [
+  // Sessions
   { code: 'first_session', label: 'Première séance', icon: '🎯', description: 'Vous avez terminé votre première séance d\'entraînement !', condition: 'Terminer 1 séance' },
   { code: '5_sessions', label: '5 séances', icon: '🔥', description: 'Vous êtes régulier ! 5 séances complétées.', condition: 'Terminer 5 séances' },
   { code: '10_sessions', label: '10 séances', icon: '💪', description: 'Votre persévérance paie. 10 séances au compteur !', condition: 'Terminer 10 séances' },
   { code: '25_sessions', label: '25 séances', icon: '⭐', description: 'Un quart de centaine ! Vous êtes un athlète confirmé.', condition: 'Terminer 25 séances' },
   { code: '50_sessions', label: '50 séances', icon: '🏆', description: 'Légende ! 50 séances d\'entraînement terminées.', condition: 'Terminer 50 séances' },
-  { code: 'streak_7', label: '7 jours consécutifs', icon: '📅', description: 'Une semaine complète de connexion quotidienne.', condition: 'Se connecter 7 jours d\'affilée' },
-  { code: 'streak_30', label: '30 jours consécutifs', icon: '🗓️', description: 'Un mois entier sans manquer un jour !', condition: 'Se connecter 30 jours d\'affilée' },
+  { code: '100_sessions', label: '100 séances', icon: '💎', description: 'Centurion ! 100 séances d\'entraînement. Machine.', condition: 'Terminer 100 séances' },
+  // Streaks
+  { code: 'streak_7', label: '7 jours consécutifs', icon: '📅', description: 'Une semaine complète de connexion quotidienne.', condition: '7 jours d\'affilée' },
+  { code: 'streak_14', label: '14 jours consécutifs', icon: '🔄', description: 'Deux semaines sans relâche !', condition: '14 jours d\'affilée' },
+  { code: 'streak_30', label: '30 jours consécutifs', icon: '🗓️', description: 'Un mois entier sans manquer un jour !', condition: '30 jours d\'affilée' },
+  { code: 'streak_60', label: '60 jours consécutifs', icon: '⚡', description: 'Deux mois de discipline pure !', condition: '60 jours d\'affilée' },
+  { code: 'streak_90', label: '90 jours consécutifs', icon: '🌟', description: 'Trois mois ! Habitude installée.', condition: '90 jours d\'affilée' },
+  // Social
   { code: 'social', label: 'Sociable', icon: '🤝', description: 'Vous avez construit un réseau de 5 amis.', condition: 'Avoir 5 amis' },
+  { code: 'social_10', label: 'Populaire', icon: '🌐', description: '10 amis dans votre réseau !', condition: 'Avoir 10 amis' },
+  { code: 'social_25', label: 'Influenceur', icon: '📢', description: '25 amis ! Vous êtes une référence.', condition: 'Avoir 25 amis' },
   { code: 'messenger', label: 'Bavard', icon: '💬', description: 'Vous adorez communiquer ! 50 messages envoyés.', condition: 'Envoyer 50 messages' },
-  { code: 'first_workout', label: 'Créateur', icon: '📋', description: 'Vous avez créé votre premier programme d\'entraînement.', condition: 'Créer 1 programme' },
-  { code: 'elite', label: 'Élite', icon: '👑', description: 'Vous avez atteint le niveau Élite. Respect absolu.', condition: 'Atteindre le niveau Élite' },
+  { code: 'messenger_200', label: 'Orateur', icon: '🎤', description: '200 messages ! Communication au top.', condition: 'Envoyer 200 messages' },
+  // Workouts
+  { code: 'first_workout', label: 'Créateur', icon: '📋', description: 'Vous avez créé votre premier programme.', condition: 'Créer 1 programme' },
+  { code: '5_workouts', label: 'Planificateur', icon: '📊', description: '5 programmes créés !', condition: 'Créer 5 programmes' },
+  { code: '10_workouts', label: 'Architecte', icon: '🏗️', description: '10 programmes ! Vous maîtrisez la planification.', condition: 'Créer 10 programmes' },
+  // Level
+  { code: 'elite', label: 'Élite', icon: '👑', description: 'Vous avez atteint le niveau Élite. Respect absolu.', condition: 'Niveau Élite' },
+  // XP
+  { code: 'xp_100', label: '100 XP', icon: '✨', description: 'Premiers 100 XP accumulés !', condition: 'Accumuler 100 XP' },
+  { code: 'xp_500', label: '500 XP', icon: '💫', description: '500 XP ! Vous progressez vite.', condition: 'Accumuler 500 XP' },
+  { code: 'xp_1000', label: '1 000 XP', icon: '🚀', description: '1 000 XP ! Athlète accompli.', condition: 'Accumuler 1 000 XP' },
+  { code: 'xp_5000', label: '5 000 XP', icon: '🔱', description: '5 000 XP ! Niveau légendaire.', condition: 'Accumuler 5 000 XP' },
+  // Challenges
+  { code: 'first_challenge', label: 'Challenger', icon: '🎪', description: 'Premier défi relevé avec succès !', condition: 'Relever 1 défi' },
+  { code: '5_challenges', label: '5 défis', icon: '🏅', description: '5 défis relevés !', condition: 'Relever 5 défis' },
+  { code: '10_challenges', label: '10 défis', icon: '🥇', description: '10 défis ! Machine à défis.', condition: 'Relever 10 défis' },
+  { code: '25_challenges', label: '25 défis', icon: '🎖️', description: '25 défis ! Inarrêtable.', condition: 'Relever 25 défis' },
+  { code: 'challenge_creator', label: 'Créateur de défi', icon: '🎨', description: 'Vous avez créé votre premier défi.', condition: 'Créer 1 défi' },
+  { code: 'challenge_creator_5', label: '5 défis créés', icon: '🧩', description: '5 défis créés pour la communauté !', condition: 'Créer 5 défis' },
+  // Groups
+  { code: 'group_member', label: 'Membre', icon: '👥', description: 'Vous avez rejoint un groupe.', condition: 'Rejoindre 1 groupe' },
+  { code: 'group_leader', label: 'Leader', icon: '🏴', description: 'Vous avez créé votre propre groupe.', condition: 'Créer 1 groupe' },
 ];
 
 export default function ProfilPage() {

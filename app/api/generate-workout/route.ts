@@ -66,7 +66,14 @@ export async function POST(req: NextRequest) {
     // ── 3. Build prompt with strict constraints ──
     const joursStr  = joursSelectes?.length ? joursSelectes.join(', ') : 'non definis';
     const equipStr  = equipements?.length
-      ? equipements.map((e: string) => `${e} (max ${equipConfig?.[e]?.maxKg ?? '?'} kg, +${equipConfig?.[e]?.progression ?? '?'} kg)`).join(', ')
+      ? equipements.map((e: string) => {
+          const conf = equipConfig?.[e];
+          const parts = [e];
+          if (conf?.maxKg) parts.push(`max ${conf.maxKg} kg`);
+          if (conf?.progression) parts.push(`progression: ${conf.progression}`);
+          if (conf?.detail) parts.push(conf.detail);
+          return parts.join(' (') + (parts.length > 1 ? ')' : '');
+        }).join(', ')
       : 'aucun';
     const figuresStr = figuresSelectees?.length
       ? figuresSelectees.map((f: string) => `${f} (niveau: ${niveauxFigures?.[f] ?? 'non defini'})`).join(', ')
@@ -82,7 +89,12 @@ Seuls les equipements autorises sont : barre de traction, barres paralleles (dip
 ${equipements?.length ? `L'utilisateur possede aussi : ${equipStr}. Tu peux les integrer dans les exercices (ex: tractions lestees, dips lestes).` : ''}
 Tous les exercices doivent etre realisables en exterieur avec ces equipements uniquement.`;
     } else if (lieu === 'Maison') {
-      lieuConstraint = `\n\nCONTRAINTE : Le lieu est "Maison". Utilise uniquement des exercices au poids du corps ou avec du petit materiel (elastiques, chaise, etc). Pas de machines ni de barres olympiques.`;
+      lieuConstraint = `\n\nCONTRAINTE : Le lieu est "Maison". Utilise uniquement des exercices au poids du corps ou avec le matériel déclaré par l'utilisateur.
+${equipements?.length ? `L'utilisateur dispose de : ${equipStr}. Intègre ces équipements dans les exercices proposés pour varier les stimulations (ex: tractions avec élastiques, squats avec haltères, etc).` : 'Pas de matériel, utilise uniquement le poids du corps, une chaise, un mur.'}
+Pas de machines de salle, pas de barres olympiques, pas de banc de musculation (sauf si déclaré).`;
+    } else if (lieu === 'Salle de sport') {
+      lieuConstraint = `\n\nCONTRAINTE : Le lieu est "Salle de sport". Tu peux utiliser tous les équipements disponibles en salle (machines, haltères, barres, cables, etc).
+${equipements?.length ? `L'utilisateur possède aussi du matériel personnel : ${equipStr}. Intègre-le si pertinent.` : ''}`;
     }
 
     const allExercises = [...new Set([...wgerExercises, ...exerciseDBNames])];

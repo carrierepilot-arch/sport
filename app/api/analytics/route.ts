@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     const totalWorkouts = await prisma.workout.count({ where: { userId } });
 
     // Completed sessions
-    const completed = sessions.filter(s => s.status === 'completed');
+    const completed = sessions.filter(s => s.status === 'done');
     const totalCompleted = completed.length;
 
     // Total training time (minutes)
@@ -82,19 +82,72 @@ export async function GET(request: NextRequest) {
     let totalSeries = 0;
     let totalReps = 0;
     for (const s of completed) {
-      if (s.results && typeof s.results === 'object') {
-        const res = s.results as Record<string, { series?: number; reps?: string | number }[]>;
-        for (const exercices of Object.values(res)) {
-          if (Array.isArray(exercices)) {
-            for (const set of exercices) {
-              totalSeries++;
-              const r = typeof set.reps === 'string' ? parseInt(set.reps) : (set.reps ?? 0);
-              if (!isNaN(r)) totalReps += r;
+      if (s.results && Array.isArray(s.results)) {
+        // results is ExerciceResult[] = [{ nom, series, targetReps, repos, sets: [{ success, repsActuelles? }] }]
+        const exercices = s.results as { nom: string; series: number; targetReps: string; repos: string; sets: { success: boolean; repsActuelles?: number }[] }[];
+        for (const exo of exercices) {
+          if (Array.isArray(exo.sets)) {
+            totalSeries += exo.sets.length;
+            for (const set of exo.sets) {
+              if (set.repsActuelles != null) {
+                totalReps += set.repsActuelles;
+              } else {
+                // If repsActuelles not tracked (success=true), use targetReps
+                const target = parseInt(String(exo.targetReps));
+                if (!isNaN(target) && set.success) totalReps += target;
+              }
             }
           }
         }
       }
     }
+
+    // Exercise breakdown (top exercises)
+    const exerciseMap: Record<string, { count: number; totalReps: number }> = {};
+    for (const s of completed) {
+      if (s.results && Array.isArray(s.results)) {
+        const exercices = s.results as { nom: string; series: number; targetReps: string; repos: string; sets: { success: boolean; repsActuelles?: number }[] }[];
+        for (const exo of exercices) {
+          if (!exerciseMap[exo.nom]) exerciseMap[exo.nom] = { count: 0, totalReps: 0 };
+          exerciseMap[exo.nom].count++;
+          if (Array.isArray(exo.sets)) {
+            for (const set of exo.sets) {
+              exerciseMap[exo.nom].totalReps += set.repsActuelles ?? (set.success ? parseInt(String(exo.targetReps)) || 0 : 0);
+            }
+          }
+        }
+      }
+    }
+    const topExercises = Object.entries(exerciseMap)
+      .map(([name, data]) => ({ name, ...data }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8);
+
+    // Monthly data (last 6 months)
+    const monthlyData: { label: string; sessions: number; minutes: number }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
+      const monthSessions = completed.filter(s => {
+        const sd = new Date(s.finishedAt ?? s.createdAt);
+        return sd >= d && sd <= monthEnd;
+      });
+      let monthMinutes = 0;
+      for (const ms of monthSessions) {
+        if (ms.startedAt && ms.finishedAt) monthMinutes += Math.round((new Date(ms.finishedAt).getTime() - new Date(ms.startedAt).getTime()) / 60000);
+      }
+      const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'];
+      monthlyData.push({ label: monthNames[d.getMonth()], sessions: monthSessions.length, minutes: monthMinutes });
+    }
+
+    // Average session duration
+    const avgMinutes = totalCompleted > 0 ? Math.round(totalMinutes / totalCompleted) : 0;
+
+    // Challenges completed count
+    const challengesCompleted = await prisma.challengeCompletion.count({ where: { userId } });
+
+    // XP
+    const userXp = await prisma.user.findUnique({ where: { id: userId }, select: { xp: true } });
 
     return NextResponse.json({
       totalWorkouts,
@@ -105,6 +158,11 @@ export async function GET(request: NextRequest) {
       streak,
       thisWeekSessions,
       weeklyData,
+      topExercises,
+      monthlyData,
+      avgMinutes,
+      challengesCompleted,
+      xp: userXp?.xp ?? 0,
     });
   } catch (error) {
     console.error('Analytics error:', error);
