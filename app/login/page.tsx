@@ -2,12 +2,15 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,8 +31,9 @@ export default function LoginPage() {
         return;
       }
 
-      // Redirection après succès
-      window.location.href = '/dashboard';
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      router.push('/dashboard');
     } catch (err) {
       setError('Une erreur est survenue');
     } finally {
@@ -38,13 +42,13 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-600 to-blue-800">
+    <div className="min-h-screen flex items-center justify-center bg-gray-950 px-4">
       <div className="w-full max-w-md">
-        <div className="bg-white rounded-lg shadow-xl p-8">
+        <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-8">
           {/* Header */}
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">SPORT</h1>
-            <p className="text-gray-600">Connectez-vous à votre compte</p>
+            <Link href="/" className="inline-block text-3xl font-black tracking-tight text-gray-900 mb-2 hover:text-blue-600 transition">SPORT</Link>
+            <p className="text-gray-500">Connectez-vous à votre compte</p>
           </div>
 
           {/* Formulaire */}

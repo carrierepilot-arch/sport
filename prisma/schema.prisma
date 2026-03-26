@@ -1,0 +1,240 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String?
+  pseudo    String?
+  isAdmin   Boolean  @default(false)
+  suspended Boolean  @default(false)
+  level     String   @default("intermediaire")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sentFriendRequests     FriendRequest[] @relation("SentRequests")
+  receivedFriendRequests FriendRequest[] @relation("ReceivedRequests")
+  sentMessages           Message[]       @relation("SentMessages")
+  receivedMessages       Message[]       @relation("ReceivedMessages")
+  sessions               UserSession[]
+  activityLogs           ActivityLog[]
+  workouts               Workout[]
+  workoutSessions        WorkoutSession[]
+  badges                 Badge[]
+  ownedGroups            Group[]        @relation("GroupOwner")
+  groupMemberships       GroupMember[]
+  performances           Performance[]
+  performanceValidations PerformanceValidation[]
+  groupMessages          GroupMessage[]
+  challengeCompletions   ChallengeCompletion[]
+  createdChallenges      Challenge[]              @relation("CreatedChallenges")
+  addedSpots             Spot[]                   @relation("AddedSpots")
+}
+
+model Badge {
+  id        String   @id @default(cuid())
+  userId    String
+  code      String
+  label     String
+  earnedAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, code])
+}
+
+model FriendRequest {
+  id         String   @id @default(cuid())
+  senderId   String
+  receiverId String
+  status     String   @default("pending")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  sender   User @relation("SentRequests",   fields: [senderId],   references: [id])
+  receiver User @relation("ReceivedRequests", fields: [receiverId], references: [id])
+
+  @@unique([senderId, receiverId])
+}
+
+model Message {
+  id         String   @id @default(cuid())
+  senderId   String
+  receiverId String
+  content    String
+  read       Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  sender   User @relation("SentMessages",     fields: [senderId],   references: [id])
+  receiver User @relation("ReceivedMessages", fields: [receiverId], references: [id])
+}
+
+model UserSession {
+  id        String   @id @default(cuid())
+  userId    String
+  ipAddress String?
+  userAgent String?
+  browser   String?
+  device    String?
+  createdAt DateTime @default(now())
+  lastSeen  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  userId    String
+  action    String
+  details   String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model Workout {
+  id          String   @id @default(cuid())
+  userId      String
+  title       String?
+  rawText     String
+  programme   Json
+  config      Json?
+  sharedBy    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user     User             @relation(fields: [userId], references: [id])
+  sessions WorkoutSession[]
+}
+
+model WorkoutSession {
+  id         String   @id @default(cuid())
+  userId     String
+  workoutId  String
+  dayLabel   String
+  status     String   @default("pending")
+  results    Json?
+  startedAt  DateTime?
+  finishedAt DateTime?
+  createdAt  DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id])
+  workout Workout @relation(fields: [workoutId], references: [id])
+}
+
+model Group {
+  id        String   @id @default(cuid())
+  name      String
+  ownerId   String
+  createdAt DateTime @default(now())
+
+  owner   User          @relation("GroupOwner", fields: [ownerId], references: [id])
+  members GroupMember[]
+  messages GroupMessage[]
+}
+
+model GroupMember {
+  id       String   @id @default(cuid())
+  groupId  String
+  userId   String
+  joinedAt DateTime @default(now())
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id])
+
+  @@unique([groupId, userId])
+}
+
+model GroupMessage {
+  id        String   @id @default(cuid())
+  groupId   String
+  userId    String
+  content   String
+  createdAt DateTime @default(now())
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id])
+}
+
+model Challenge {
+  id                 String    @id @default(cuid())
+  title              String
+  description        String
+  exercise           String
+  target             Float
+  unit               String    @default("reps")
+  weekStart          DateTime?
+  weekEnd            DateTime?
+  badgeCode          String    @default("")
+  badgeLabel         String    @default("")
+  creatorId          String?
+  isPublic           Boolean   @default(false)
+  submittedForReview Boolean   @default(false)
+  adminApproved      Boolean   @default(false)
+  challengeType      String    @default("simple")
+  circuitData        Json?
+  createdAt          DateTime  @default(now())
+
+  creator     User?               @relation("CreatedChallenges", fields: [creatorId], references: [id])
+  completions ChallengeCompletion[]
+}
+
+model ChallengeCompletion {
+  id          String   @id @default(cuid())
+  userId      String
+  challengeId String
+  completedAt DateTime @default(now())
+
+  user      User      @relation(fields: [userId], references: [id])
+  challenge Challenge @relation(fields: [challengeId], references: [id])
+
+  @@unique([userId, challengeId])
+}
+
+model Spot {
+  id           String        @id @default(cuid())
+  name         String
+  city         String?
+  addedBy      String?
+  status       String        @default("approved")
+  createdAt    DateTime      @default(now())
+
+  addedByUser  User?         @relation("AddedSpots", fields: [addedBy], references: [id])
+  performances Performance[]
+}
+
+model Performance {
+  id        String   @id @default(cuid())
+  userId    String
+  spotId    String
+  exercise  String
+  score     Float
+  unit      String   @default("reps")
+  status    String   @default("pending")
+  videoUrl  String?
+  createdAt DateTime @default(now())
+
+  user        User                    @relation(fields: [userId], references: [id])
+  spot        Spot                    @relation(fields: [spotId], references: [id])
+  validations PerformanceValidation[]
+}
+
+model PerformanceValidation {
+  id            String   @id @default(cuid())
+  performanceId String
+  validatorId   String
+  status        String   @default("accepted")  // "pending" | "accepted" | "rejected"
+  createdAt     DateTime @default(now())
+
+  performance Performance @relation(fields: [performanceId], references: [id], onDelete: Cascade)
+  validator   User        @relation(fields: [validatorId], references: [id])
+
+  @@unique([performanceId, validatorId])
+}
