@@ -123,8 +123,8 @@ export default function AnalysePage() {
   };
 
   return (
-    <main className="flex-1 px-4 py-6 sm:px-8 sm:py-10">
-      <div className="max-w-5xl">
+    <main className="flex-1 px-3 py-6 sm:px-6 md:px-8 sm:py-10 overflow-x-hidden">
+      <div className="max-w-5xl w-full">
         <div className="mb-6 sm:mb-8">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Analyse</h1>
           <p className="text-gray-500 mt-1">Vue d&apos;ensemble de vos performances et de votre évolution.</p>
@@ -284,6 +284,87 @@ export default function AnalysePage() {
                 ))}
               </div>
             </div>
+
+            {/* Intensité & Volume */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Volume chart (séries + reps par semaine) */}
+              <div className="bg-white border border-gray-200 rounded-2xl p-5 sm:p-6">
+                <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-4">Volume d&apos;entraînement</h2>
+                <div className="space-y-4">
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-gray-500">Séries totales</span>
+                      <span className="text-sm font-bold text-gray-900">{data.totalSeries.toLocaleString()}</span>
+                    </div>
+                    <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-gradient-to-r from-blue-500 to-blue-400 rounded-full" style={{ width: `${Math.min((data.totalSeries / Math.max(data.totalSeries, 500)) * 100, 100)}%` }} />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-gray-500">Répétitions totales</span>
+                      <span className="text-sm font-bold text-gray-900">{data.totalReps.toLocaleString()}</span>
+                    </div>
+                    <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full" style={{ width: `${Math.min((data.totalReps / Math.max(data.totalReps, 5000)) * 100, 100)}%` }} />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-gray-500">Temps total</span>
+                      <span className="text-sm font-bold text-gray-900">{timeStr}</span>
+                    </div>
+                    <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-gradient-to-r from-orange-500 to-orange-400 rounded-full" style={{ width: `${Math.min((data.totalMinutes / Math.max(data.totalMinutes, 600)) * 100, 100)}%` }} />
+                    </div>
+                  </div>
+                  <div className="pt-2 border-t border-gray-100">
+                    <p className="text-xs text-gray-400">
+                      Ratio reps/série : <span className="font-semibold text-gray-700">{data.totalSeries > 0 ? (data.totalReps / data.totalSeries).toFixed(1) : '—'}</span> reps/série en moyenne
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Progression & Niveau */}
+              <div className="bg-white border border-gray-200 rounded-2xl p-5 sm:p-6">
+                <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-4">Progression XP</h2>
+                {(() => {
+                  const level = Math.floor(data.xp / 500) + 1;
+                  const xpInLevel = data.xp % 500;
+                  const xpPercent = Math.round((xpInLevel / 500) * 100);
+                  return (
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-4">
+                        <div className="w-16 h-16 bg-gradient-to-br from-violet-500 to-purple-600 rounded-2xl flex items-center justify-center flex-shrink-0">
+                          <span className="text-2xl font-black text-white">{level}</span>
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-gray-900">Palier {level}</p>
+                          <p className="text-xs text-gray-400 mb-2">{xpInLevel} / 500 XP pour le palier suivant</p>
+                          <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                            <div className="h-full bg-gradient-to-r from-violet-500 to-purple-500 rounded-full transition-all" style={{ width: `${xpPercent}%` }} />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3 pt-2">
+                        <div className="bg-gray-50 rounded-xl p-3 text-center">
+                          <p className="text-lg font-bold text-gray-900">{data.totalCompleted}</p>
+                          <p className="text-xs text-gray-400">Séances</p>
+                        </div>
+                        <div className="bg-gray-50 rounded-xl p-3 text-center">
+                          <p className="text-lg font-bold text-gray-900">{data.challengesCompleted}</p>
+                          <p className="text-xs text-gray-400">Défis</p>
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-400 text-center">
+                        {data.xp >= 2500 ? '🏆 Athlète confirmé !' : data.xp >= 1000 ? '💪 En bonne voie !' : '🚀 Continuez comme ça !'}
+                      </p>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
           </div>
         )}
 
@@ -415,7 +496,7 @@ export default function AnalysePage() {
                       type="number" step="0.1" placeholder={f.placeholder}
                       value={(physForm as Record<string, number | undefined>)[f.key] ?? ''}
                       onChange={e => setPhysForm(p => ({ ...p, [f.key]: e.target.value ? Number(e.target.value) : undefined }))}
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none"
+                      className="w-full px-3 py-2 text-sm text-gray-900 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none"
                     />
                   </div>
                 ))}

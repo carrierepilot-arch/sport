@@ -135,6 +135,10 @@ export default function ReseauPage() {
   const [sendingValReq,   setSendingValReq]   = useState(false);
   const [valRequestsIn,   setValRequestsIn]   = useState<PerfValidReq[]>([]);
   const [mobileMsgView, setMobileMsgView] = useState<'list' | 'chat'>('list');
+  const [convType, setConvType] = useState<'dm' | 'group'>('dm');
+  const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
+  const [activeGroupMsgs, setActiveGroupMsgs] = useState<GroupMsg[]>([]);
+  const [activeGroupInput, setActiveGroupInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const chargerAmis = useCallback(async () => {
@@ -378,7 +382,7 @@ export default function ReseauPage() {
     } catch { /* silencieux */ }
   };
 
-  const ouvrirConversation = (friendId: string) => { setConvActive(friendId); setMobileMsgView('chat'); setTab('messages'); localStorage.setItem('reseau_tab', 'messages'); };
+  const ouvrirConversation = (friendId: string) => { setConvType('dm'); setActiveGroupId(null); setConvActive(friendId); setMobileMsgView('chat'); setTab('messages'); localStorage.setItem('reseau_tab', 'messages'); };
 
   const envoyerMessage = async () => {
     if (!msgInput.trim() || !convActive) return;
@@ -395,6 +399,50 @@ export default function ReseauPage() {
   };
 
   const convEnCours = conversations.find((c) => c.friendId === convActive);
+  const activeGroup = mesGroupes.find((g) => g.id === activeGroupId);
+
+  const ouvrirGroupeChat = (groupId: string) => {
+    setConvType('group');
+    setActiveGroupId(groupId);
+    setConvActive(null);
+    setMobileMsgView('chat');
+    setTab('messages');
+    localStorage.setItem('reseau_tab', 'messages');
+    chargerGroupMessages(groupId).then((data) => {/* loaded via effect */});
+  };
+
+  // Load group messages when activeGroupId changes (for unified chat)
+  useEffect(() => {
+    if (!activeGroupId) { setActiveGroupMsgs([]); return; }
+    const load = async () => {
+      try {
+        const res = await fetch(`/api/groups/messages?groupId=${activeGroupId}`, { headers: authHeader() });
+        if (!res.ok) return;
+        const data = await res.json();
+        setActiveGroupMsgs(data.messages ?? []);
+        if (data.currentUserId) setGroupChatUserId(data.currentUserId);
+      } catch {/* */}
+    };
+    load();
+    const interval = setInterval(load, 4000);
+    return () => clearInterval(interval);
+  }, [activeGroupId]);
+
+  const envoyerActiveGroupMsg = async () => {
+    if (!activeGroupInput.trim() || !activeGroupId) return;
+    const texte = activeGroupInput.trim();
+    setActiveGroupInput('');
+    try {
+      const res = await fetch('/api/groups/messages', {
+        method: 'POST', headers: authHeader(),
+        body: JSON.stringify({ groupId: activeGroupId, content: texte }),
+      });
+      if (res.ok) {
+        const r2 = await fetch(`/api/groups/messages?groupId=${activeGroupId}`, { headers: authHeader() });
+        if (r2.ok) { const d = await r2.json(); setActiveGroupMsgs(d.messages ?? []); }
+      }
+    } catch {/* */}
+  };
 
   const creerGroupe = async () => {
     if (!nomGroupe.trim()) return;
@@ -470,8 +518,8 @@ export default function ReseauPage() {
   };
 
   return (
-    <main className="flex-1 px-4 py-6 sm:px-8 sm:py-10">
-      <div className="max-w-5xl">
+    <main className="flex-1 px-3 py-6 sm:px-6 md:px-8 sm:py-10 overflow-x-hidden">
+      <div className="max-w-5xl w-full">
         <div className="mb-6 sm:mb-8">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Reseau</h1>
           <p className="text-gray-500 mt-1">Amis, messagerie et groupes d'entrainement.</p>
@@ -520,7 +568,7 @@ export default function ReseauPage() {
                     onChange={(e) => { setRecherche(e.target.value); setErreur(''); }}
                     onKeyDown={(e) => e.key === 'Enter' && envoyerDemande()}
                     placeholder="pseudo, prénom ou email"
-                    className="w-full pl-7 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 outline-none transition"
+                    className="w-full pl-7 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:ring-2 focus:ring-gray-900 outline-none transition"
                   />
                 </div>
                 <button onClick={envoyerDemande} disabled={loading}
@@ -539,10 +587,9 @@ export default function ReseauPage() {
                   {amis.filter((a) => a.statut === 'recu').map((a) => (
                     <div key={a.id} className="flex items-center justify-between py-2">
                       <div className="flex items-center gap-3">
-                        <Avatar letter={a.nom[0]} />
+                        <Avatar letter={a.pseudo[0] || a.nom[0]} />
                         <div>
-                          <p className="text-sm font-semibold text-gray-900">{a.nom}</p>
-                          <p className="text-xs text-gray-400">@{a.pseudo}</p>
+                          <p className="text-sm font-semibold text-gray-900">@{a.pseudo}</p>
                         </div>
                       </div>
                       <div className="flex gap-2">
@@ -572,10 +619,9 @@ export default function ReseauPage() {
                 {amis.filter((a) => a.statut === 'accepte').map((a) => (
                   <div key={a.id} className="flex items-center justify-between py-3 px-2 rounded-lg hover:bg-gray-50 transition">
                     <div className="flex items-center gap-3">
-                      <Avatar letter={a.nom[0]} />
+                      <Avatar letter={(a.pseudo || a.nom)[0]} />
                       <div>
-                        <p className="text-sm font-semibold text-gray-900">{a.nom}</p>
-                        <p className="text-xs text-gray-400">@{a.pseudo}</p>
+                        <p className="text-sm font-semibold text-gray-900">@{a.pseudo}</p>
                       </div>
                     </div>
                     <button onClick={() => ouvrirConversation(a.friendId)}
@@ -589,7 +635,7 @@ export default function ReseauPage() {
                     <p className="text-xs text-gray-400 font-medium mb-2">En attente de réponse</p>
                     {amis.filter((a) => a.statut === 'en_attente').map((a) => (
                       <div key={a.id} className="flex items-center gap-3 py-2 px-2">
-                        <Avatar letter={a.nom[0]} />
+                        <Avatar letter={(a.pseudo || a.nom)[0]} />
                         <div>
                           <p className="text-sm text-gray-600">@{a.pseudo}</p>
                           <p className="text-xs text-amber-600">Demande envoyée</p>
@@ -605,32 +651,25 @@ export default function ReseauPage() {
 
         {/* ── MESSAGES ── */}
         {tab === 'messages' && (
-          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col md:flex-row h-[480px] md:h-[520px]">
-            <div className={`flex-col flex-shrink-0 md:w-72 border-b md:border-b-0 md:border-r border-gray-100 ${mobileMsgView === 'chat' ? 'hidden md:flex' : 'flex w-full'}`}>
-              <div className="p-4 border-b border-gray-100">
-                <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Conversations</h2>
+          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col md:flex-row h-[calc(100vh-220px)] min-h-[400px] max-h-[700px] shadow-sm">
+            <div className={`flex-col flex-shrink-0 md:w-80 border-b md:border-b-0 md:border-r border-gray-200 bg-white ${mobileMsgView === 'chat' ? 'hidden md:flex' : 'flex w-full'}`}>
+              <div className="p-4 border-b border-gray-200 bg-gradient-to-r from-emerald-600 to-teal-600">
+                <h2 className="text-sm font-bold text-white">💬 Conversations</h2>
               </div>
               <div className="flex-1 overflow-y-auto">
-                {amis.filter((a) => a.statut === 'accepte' && !conversations.find((c) => c.friendId === a.friendId)).map((a) => (
-                  <button key={a.friendId} onClick={() => { setConvActive(a.friendId); setMobileMsgView('chat'); }}
-                    className={`w-full flex items-center gap-3 px-4 py-3.5 text-left transition border-b border-gray-50 ${convActive === a.friendId ? 'bg-gray-50' : 'hover:bg-gray-50'}`}>
-                    <Avatar letter={a.nom[0]} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-900 truncate">{a.nom}</p>
-                      <p className="text-xs text-gray-400 truncate mt-0.5">@{a.pseudo}</p>
-                    </div>
-                  </button>
-                ))}
-                {conversations.length === 0 && amis.filter((a) => a.statut === 'accepte').length === 0 && (
-                  <p className="text-xs text-gray-400 text-center p-6">Ajoutez des amis pour démarrer une conversation.</p>
+                {/* Section: DMs */}
+                {(conversations.length > 0 || amis.filter((a) => a.statut === 'accepte').length > 0) && (
+                  <div className="px-4 py-2 bg-gray-50 border-b border-gray-100">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Messages directs</p>
+                  </div>
                 )}
                 {conversations.map((m) => (
-                  <button key={m.friendId} onClick={() => { setConvActive(m.friendId); setMobileMsgView('chat'); }}
-                    className={`w-full flex items-center gap-3 px-4 py-3.5 text-left transition border-b border-gray-50 ${convActive === m.friendId ? 'bg-gray-50' : 'hover:bg-gray-50'}`}>
-                    <Avatar letter={m.nom[0]} />
+                  <button key={m.friendId} onClick={() => { setConvType('dm'); setActiveGroupId(null); setConvActive(m.friendId); setMobileMsgView('chat'); }}
+                    className={`w-full flex items-center gap-3 px-4 py-3.5 text-left transition border-b border-gray-50 ${convType === 'dm' && convActive === m.friendId ? 'bg-emerald-50 border-l-4 border-l-emerald-500' : 'hover:bg-gray-50'}`}>
+                    <Avatar letter={(m.pseudo || m.nom)[0]} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
-                        <p className="text-sm font-semibold text-gray-900 truncate">{m.nom}</p>
+                        <p className="text-sm font-semibold text-gray-900 truncate">@{m.pseudo || m.nom}</p>
                         <span className="text-xs text-gray-400 ml-2 flex-shrink-0">{m.heure}</span>
                       </div>
                       <p className="text-xs text-gray-400 truncate mt-0.5">{m.dernier.startsWith('__WORKOUT_SHARE__') ? '📋 Programme partagé' : m.dernier}</p>
@@ -642,31 +681,65 @@ export default function ReseauPage() {
                     )}
                   </button>
                 ))}
+                {amis.filter((a) => a.statut === 'accepte' && !conversations.find((c) => c.friendId === a.friendId)).map((a) => (
+                  <button key={a.friendId} onClick={() => { setConvType('dm'); setActiveGroupId(null); setConvActive(a.friendId); setMobileMsgView('chat'); }}
+                    className={`w-full flex items-center gap-3 px-4 py-3.5 text-left transition border-b border-gray-50 ${convType === 'dm' && convActive === a.friendId ? 'bg-emerald-50 border-l-4 border-l-emerald-500' : 'hover:bg-gray-50'}`}>
+                    <Avatar letter={(a.pseudo || a.nom)[0]} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-900 truncate">@{a.pseudo}</p>
+                      <p className="text-xs text-gray-400 truncate mt-0.5">Pas encore de messages</p>
+                    </div>
+                  </button>
+                ))}
+                {/* Section: Groups */}
+                {mesGroupes.length > 0 && (
+                  <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 border-t border-t-gray-100">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Groupes</p>
+                  </div>
+                )}
+                {mesGroupes.map((g) => (
+                  <button key={g.id} onClick={() => ouvrirGroupeChat(g.id)}
+                    className={`w-full flex items-center gap-3 px-4 py-3.5 text-left transition border-b border-gray-50 ${convType === 'group' && activeGroupId === g.id ? 'bg-emerald-50 border-l-4 border-l-emerald-500' : 'hover:bg-gray-50'}`}>
+                    <div className="w-9 h-9 bg-emerald-100 rounded-full flex items-center justify-center flex-shrink-0">
+                      <svg className="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-900 truncate">{g.name}</p>
+                      <p className="text-xs text-gray-400 truncate mt-0.5">{g.members.length} membre{g.members.length > 1 ? 's' : ''}</p>
+                    </div>
+                  </button>
+                ))}
+                {conversations.length === 0 && amis.filter((a) => a.statut === 'accepte').length === 0 && mesGroupes.length === 0 && (
+                  <p className="text-xs text-gray-400 text-center p-6">Ajoutez des amis ou créez un groupe pour démarrer.</p>
+                )}
               </div>
             </div>
 
             <div className={`flex-1 flex-col ${mobileMsgView === 'list' ? 'hidden md:flex' : 'flex'}`}>
-              {convActive ? (
+              {/* ── DM Chat ── */}
+              {convType === 'dm' && convActive ? (
                 <>
-                  <div className="px-4 py-3 sm:px-5 sm:py-4 border-b border-gray-100 flex items-center gap-2 sm:gap-3">
+                  <div className="px-4 py-3 sm:px-5 sm:py-4 border-b border-gray-200 bg-gradient-to-r from-emerald-600 to-teal-600 flex items-center gap-2 sm:gap-3">
                     <button
-                      className="md:hidden flex-shrink-0 p-1 -ml-1 text-gray-500 hover:text-gray-900 transition"
+                      className="md:hidden flex-shrink-0 p-1 -ml-1 text-white/80 hover:text-white transition"
                       onClick={() => setMobileMsgView('list')}
                     >
                       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
                       </svg>
                     </button>
-                    <Avatar letter={(convEnCours?.nom ?? amis.find((a) => a.friendId === convActive)?.nom ?? '?')[0]} />
+                    <Avatar letter={(convEnCours?.pseudo ?? amis.find((a) => a.friendId === convActive)?.pseudo ?? '?')[0]} />
                     <div>
-                      <p className="text-sm font-semibold text-gray-900">
-                        {convEnCours?.nom ?? amis.find((a) => a.friendId === convActive)?.nom ?? 'Ami'}
+                      <p className="text-sm font-semibold text-white">
+                        @{convEnCours?.pseudo ?? amis.find((a) => a.friendId === convActive)?.pseudo ?? 'ami'}
                       </p>
-                      <p className="text-xs text-gray-400">@{convEnCours?.pseudo ?? amis.find((a) => a.friendId === convActive)?.pseudo}</p>
+                      <p className="text-xs text-emerald-100">En ligne</p>
                     </div>
-                    <span className="ml-auto text-xs text-emerald-500">● Sync auto</span>
+                    <span className="ml-auto text-xs text-emerald-100 flex items-center gap-1"><span className="w-1.5 h-1.5 bg-emerald-300 rounded-full animate-pulse"></span> Sync</span>
                   </div>
-                  <div className="flex-1 p-5 bg-gray-50 overflow-y-auto flex flex-col gap-2">
+                  <div className="flex-1 p-4 sm:p-5 overflow-y-auto flex flex-col gap-2" style={{backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%2310b981\' fill-opacity=\'0.04\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")', backgroundColor: '#f0fdf4'}}>
                     {chat.length === 0 && (
                       <p className="text-sm text-gray-400 text-center my-auto">Aucun message. Envoyez le premier !</p>
                     )}
@@ -761,15 +834,68 @@ export default function ReseauPage() {
                     })}
                     <div ref={messagesEndRef} />
                   </div>
-                  <div className="p-3 border-t border-gray-100 flex gap-2">
+                  <div className="p-3 border-t border-gray-200 bg-gray-50 flex gap-2 items-end">
                     <input type="text" value={msgInput} onChange={(e) => setMsgInput(e.target.value)}
-                      placeholder="Message..." onKeyDown={(e) => e.key === 'Enter' && envoyerMessage()}
-                      className="flex-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none transition bg-white" />
-                    <button onClick={envoyerMessage} className="px-3 sm:px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-semibold rounded-xl transition flex items-center gap-1.5 flex-shrink-0">
-                      <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      placeholder="Tapez un message..." onKeyDown={(e) => e.key === 'Enter' && envoyerMessage()}
+                      className="flex-1 px-4 py-2.5 border border-gray-200 rounded-full text-sm text-gray-900 bg-white focus:ring-2 focus:ring-emerald-500 outline-none transition" />
+                    <button onClick={envoyerMessage} className="w-10 h-10 bg-emerald-500 hover:bg-emerald-400 text-white rounded-full transition flex items-center justify-center flex-shrink-0 shadow-md">
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                       </svg>
-                      <span className="hidden sm:inline">Envoyer</span>
+                    </button>
+                  </div>
+                </>
+              ) : convType === 'group' && activeGroupId && activeGroup ? (
+                /* ── Group Chat ── */
+                <>
+                  <div className="px-4 py-3 sm:px-5 sm:py-4 border-b border-gray-200 bg-gradient-to-r from-emerald-600 to-teal-600 flex items-center gap-2 sm:gap-3">
+                    <button
+                      className="md:hidden flex-shrink-0 p-1 -ml-1 text-white/80 hover:text-white transition"
+                      onClick={() => setMobileMsgView('list')}
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                      </svg>
+                    </button>
+                    <div className="w-9 h-9 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
+                      <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-white">{activeGroup.name}</p>
+                      <p className="text-xs text-emerald-100">{activeGroup.members.length} membre{activeGroup.members.length > 1 ? 's' : ''}</p>
+                    </div>
+                    <span className="ml-auto text-xs text-emerald-100 flex items-center gap-1"><span className="w-1.5 h-1.5 bg-emerald-300 rounded-full animate-pulse"></span> Sync</span>
+                  </div>
+                  <div className="flex-1 p-4 sm:p-5 overflow-y-auto flex flex-col gap-2" style={{backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%2310b981\' fill-opacity=\'0.04\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")', backgroundColor: '#f0fdf4'}}>
+                    {activeGroupMsgs.length === 0 && (
+                      <p className="text-sm text-gray-400 text-center my-auto">Aucun message dans ce groupe. Écrivez le premier !</p>
+                    )}
+                    {activeGroupMsgs.map((m) => {
+                      const isMe = m.userId === groupChatUserId;
+                      return (
+                        <div key={m.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                          <div className={`max-w-[75%] px-4 py-2.5 rounded-2xl text-sm ${isMe ? 'bg-emerald-500 text-white rounded-br-md' : 'bg-white border border-gray-200 text-gray-900 rounded-bl-md'}`}>
+                            {!isMe && (
+                              <p className="text-xs font-semibold mb-0.5 text-emerald-600">@{m.user.pseudo || m.user.name}</p>
+                            )}
+                            <p>{m.content}</p>
+                            <p className={`text-xs mt-1 ${isMe ? 'text-emerald-100' : 'text-gray-400'}`}>{new Date(m.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div ref={messagesEndRef} />
+                  </div>
+                  <div className="p-3 border-t border-gray-200 bg-gray-50 flex gap-2 items-end">
+                    <input type="text" value={activeGroupInput} onChange={(e) => setActiveGroupInput(e.target.value)}
+                      placeholder="Message au groupe..." onKeyDown={(e) => e.key === 'Enter' && envoyerActiveGroupMsg()}
+                      className="flex-1 px-4 py-2.5 border border-gray-200 rounded-full text-sm text-gray-900 bg-white focus:ring-2 focus:ring-emerald-500 outline-none transition" />
+                    <button onClick={envoyerActiveGroupMsg} className="w-10 h-10 bg-emerald-500 hover:bg-emerald-400 text-white rounded-full transition flex items-center justify-center flex-shrink-0 shadow-md">
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                      </svg>
                     </button>
                   </div>
                 </>
@@ -794,7 +920,7 @@ export default function ReseauPage() {
                 <input type="text" value={nomGroupe} onChange={(e) => setNomGroupe(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && creerGroupe()}
                   placeholder="Nom du groupe"
-                  className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 outline-none transition" />
+                  className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:ring-2 focus:ring-gray-900 outline-none transition" />
                 <button onClick={creerGroupe}
                   className="w-full sm:w-auto px-5 py-2.5 bg-gray-900 hover:bg-gray-700 text-white text-sm font-semibold rounded-lg transition">
                   Créer
@@ -873,7 +999,7 @@ export default function ReseauPage() {
                                     }`}>
                                       {!isMe && (
                                         <p className="text-xs font-semibold mb-0.5" style={{ color: '#6b7280' }}>
-                                          {m.user.name || m.user.pseudo}
+                                          @{m.user.pseudo || m.user.name}
                                         </p>
                                       )}
                                       <p>{m.content}</p>
@@ -889,7 +1015,7 @@ export default function ReseauPage() {
                                 onChange={(e) => setGroupChatInput(e.target.value)}
                                 onKeyDown={(e) => e.key === 'Enter' && envoyerGroupMessage(g.id)}
                                 placeholder="Écrivez un message..."
-                                className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none"
+                                className="flex-1 px-3 py-2 text-sm text-gray-900 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none"
                               />
                               <button
                                 onClick={() => envoyerGroupMessage(g.id)}
@@ -910,8 +1036,7 @@ export default function ReseauPage() {
                                 <div className="flex items-center gap-3">
                                   <Avatar letter={(m.user.pseudo || m.user.name || '?')[0]} />
                                   <div>
-                                    <p className="text-sm font-medium text-gray-900">{m.user.name || m.user.pseudo || 'Utilisateur'}</p>
-                                    {m.user.pseudo && <p className="text-xs text-gray-400">@{m.user.pseudo}</p>}
+                                    <p className="text-sm font-medium text-gray-900">@{m.user.pseudo || m.user.name || 'utilisateur'}</p>
                                   </div>
                                   {m.user.id === g.ownerId && (
                                     <span className="text-xs bg-gray-900 text-white px-2 py-0.5 rounded-full">Admin</span>
@@ -943,7 +1068,7 @@ export default function ReseauPage() {
                                   value={addMemberSearch}
                                   onChange={(e) => setAddMemberSearch(e.target.value)}
                                   placeholder="Rechercher un ami..."
-                                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 outline-none"
+                                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 bg-white focus:ring-2 focus:ring-gray-900 outline-none"
                                 />
                                 <div className="max-h-40 overflow-y-auto space-y-1">
                                   {amis
@@ -957,11 +1082,10 @@ export default function ReseauPage() {
                                         className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-emerald-50 text-left transition"
                                       >
                                         <div className="w-7 h-7 bg-gray-200 rounded-full flex items-center justify-center text-xs font-semibold text-gray-700">
-                                          {(a.nom || a.pseudo || '?')[0].toUpperCase()}
+                                          {(a.pseudo || a.nom || '?')[0].toUpperCase()}
                                         </div>
                                         <div className="flex-1">
-                                          <p className="text-sm font-medium text-gray-900">{a.nom}</p>
-                                          <p className="text-xs text-gray-400">@{a.pseudo}</p>
+                                          <p className="text-sm font-medium text-gray-900">@{a.pseudo}</p>
                                         </div>
                                         <span className="text-xs text-emerald-600 font-semibold">+ Ajouter</span>
                                       </button>
@@ -1004,8 +1128,7 @@ export default function ReseauPage() {
                     <div key={req.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-5 py-3 gap-2 sm:gap-4">
                       <div>
                         <p className="text-sm font-semibold text-gray-900">
-                          {req.performance.user.name || req.performance.user.pseudo}
-                          <span className="ml-1 text-xs font-normal text-gray-400">(@{req.performance.user.pseudo})</span>
+                          @{req.performance.user.pseudo}
                         </p>
                         <p className="text-xs text-gray-600">
                           {req.performance.exercise} — <span className="font-bold">{req.performance.score} {req.performance.unit}</span>
@@ -1103,13 +1226,13 @@ export default function ReseauPage() {
                     value={newSpotName}
                     onChange={(e) => setNewSpotName(e.target.value)}
                     placeholder="Nom du spot (ex: Parc de la Villette)"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
                   />
                   <input
                     value={newSpotCity}
                     onChange={(e) => setNewSpotCity(e.target.value)}
                     placeholder="Ville (optionnel)"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
                   />
                   <div className="flex gap-2">
                     <button
@@ -1159,7 +1282,7 @@ export default function ReseauPage() {
                         <select
                           value={perfExercise}
                           onChange={(e) => setPerfExercise(e.target.value)}
-                          className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 outline-none"
+                          className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 bg-white focus:ring-2 focus:ring-gray-900 outline-none"
                         >
                           <optgroup label="Endurance (reps)">
                             {PERF_EXERCISES.filter((e) => e.categorie === 'Endurance').map((e) => (
@@ -1182,7 +1305,7 @@ export default function ReseauPage() {
                           value={perfScore}
                           onChange={(e) => setPerfScore(e.target.value)}
                           placeholder={PERF_EXERCISES.find((e) => e.key === perfExercise)?.unit === 'kg' ? 'ex: 20' : 'ex: 15'}
-                          className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 outline-none"
+                          className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 bg-white focus:ring-2 focus:ring-gray-900 outline-none"
                         />
                       </div>
                     </div>
@@ -1240,10 +1363,9 @@ export default function ReseauPage() {
                                       </div>
                                       <div>
                                         <p className="text-sm font-semibold text-gray-900">
-                                          {p.user.name || p.user.pseudo}
+                                          @{p.user.pseudo}
                                           {isOwn && <span className="ml-1 text-xs text-gray-400">(moi)</span>}
                                         </p>
-                                        <p className="text-xs text-gray-400">@{p.user.pseudo}</p>
                                       </div>
                                     </div>
                                     <div className="flex items-center gap-3">
@@ -1302,8 +1424,7 @@ export default function ReseauPage() {
                                                   }}
                                                   className="rounded border-gray-300"
                                                 />
-                                                <span className="text-sm text-gray-800">{a.nom || a.pseudo}</span>
-                                                <span className="text-xs text-gray-400">@{a.pseudo}</span>
+                                                <span className="text-sm text-gray-800">@{a.pseudo}</span>
                                               </label>
                                             ))}
                                           </div>

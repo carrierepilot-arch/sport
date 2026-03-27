@@ -230,7 +230,7 @@ export default function ProfilPage() {
                         type="text"
                         value={pseudo}
                         onChange={(e) => setPseudo(e.target.value)}
-                        className="w-full pl-7 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none transition text-sm"
+                        className="w-full pl-7 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none transition text-sm text-gray-900 bg-white"
                         placeholder="votre_pseudo"
                       />
                     </div>
@@ -241,7 +241,7 @@ export default function ProfilPage() {
                       type="text"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none transition text-sm"
+                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none transition text-sm text-gray-900 bg-white"
                       placeholder="Votre prénom ou nom complet"
                     />
                   </div>
@@ -264,11 +264,11 @@ export default function ProfilPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Poids (kg)</label>
-                    <input type="number" placeholder="75" className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none transition text-sm" />
+                    <input type="number" placeholder="75" className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none transition text-sm text-gray-900 bg-white" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Taille (cm)</label>
-                    <input type="number" placeholder="180" className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none transition text-sm" />
+                    <input type="number" placeholder="180" className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none transition text-sm text-gray-900 bg-white" />
                   </div>
                 </div>
               </div>
@@ -276,7 +276,7 @@ export default function ProfilPage() {
               {/* Section objectif */}
               <div className="mb-6">
                 <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Objectif sportif</h2>
-                <select className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none transition text-sm bg-white">
+                <select className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none transition text-sm text-gray-900 bg-white">
                   <option>Force</option>
                   <option>Cardio</option>
                   <option>Endurance</option>

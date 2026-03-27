@@ -1109,7 +1109,7 @@ export default function EntrainementPage() {
         />
       )}
 
-    <main className="flex-1 px-4 py-6 sm:px-8 sm:py-10 max-w-3xl">
+    <main className="flex-1 px-3 py-6 sm:px-6 md:px-8 sm:py-10 w-full max-w-3xl overflow-x-hidden">
       <div className="mb-5 sm:mb-6">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Entrainement</h1>
         <p className="text-sm text-gray-500 mt-1">Configurez votre programme et suivez vos performances.</p>
@@ -1666,7 +1666,7 @@ export default function EntrainementPage() {
                     placeholder="Rechercher un ami..."
                     value={shareSearch}
                     onChange={(e) => setShareSearch(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
                   />
                 </div>
                 <div className="p-3 max-h-64 overflow-y-auto">
@@ -2136,26 +2136,26 @@ export default function EntrainementPage() {
 
                 <input
                   type="text" placeholder="Titre du défi" value={newChallTitle} onChange={(e) => setNewChallTitle(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none"
+                  className="w-full px-3 py-2 text-sm text-gray-900 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none"
                 />
                 <textarea
                   placeholder="Description (comment le réussir, règles...)" value={newChallDesc} onChange={(e) => setNewChallDesc(e.target.value)}
-                  rows={2} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none resize-none"
+                  rows={2} className="w-full px-3 py-2 text-sm text-gray-900 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none resize-none"
                 />
 
                 {newChallType === 'simple' && (
                   <div className="flex gap-2">
                     <input
                       type="text" placeholder="Exercice (ex: tractions)" value={newChallExercise} onChange={(e) => setNewChallExercise(e.target.value)}
-                      className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none"
+                      className="flex-1 px-3 py-2 text-sm text-gray-900 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none"
                     />
                     <input
                       type="number" placeholder="Objectif" value={newChallTarget} onChange={(e) => setNewChallTarget(e.target.value)}
-                      className="w-24 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none"
+                      className="w-24 px-3 py-2 text-sm text-gray-900 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none"
                     />
                     <select
                       value={newChallUnit} onChange={(e) => setNewChallUnit(e.target.value)}
-                      className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none"
+                      className="px-3 py-2 text-sm text-gray-900 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none"
                     >
                       <option value="reps">répétitions</option>
                       <option value="kg">kg</option>
@@ -2177,7 +2177,7 @@ export default function EntrainementPage() {
                             updated[i] = { ...updated[i], nom: e.target.value };
                             setCircuitExercises(updated);
                           }}
-                          className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none"
+                          className="flex-1 px-3 py-2 text-sm text-gray-900 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none"
                         />
                         <input
                           type="number" min={1} value={ex.reps}
@@ -2186,7 +2186,7 @@ export default function EntrainementPage() {
                             updated[i] = { ...updated[i], reps: parseInt(e.target.value) || 1 };
                             setCircuitExercises(updated);
                           }}
-                          className="w-20 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none text-center"
+                          className="w-20 px-3 py-2 text-sm text-gray-900 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none text-center"
                         />
                         <span className="text-xs text-gray-400">reps</span>
                         {circuitExercises.length > 1 && (
@@ -2207,7 +2207,7 @@ export default function EntrainementPage() {
                         <div className="flex items-center gap-2">
                           <input type="number" min={0} step={15} value={circuitRepos}
                             onChange={(e) => setCircuitRepos(parseInt(e.target.value) || 0)}
-                            className="w-20 px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none text-center" />
+                            className="w-20 px-3 py-2 text-sm text-gray-900 bg-white border border-gray-200 rounded-lg outline-none text-center" />
                           <span className="text-xs text-gray-400">secondes</span>
                         </div>
                       </div>
@@ -2215,7 +2215,7 @@ export default function EntrainementPage() {
                         <label className="text-xs text-gray-500 font-medium block mb-1">Nombre de tours</label>
                         <input type="number" min={1} max={20} value={circuitTours}
                           onChange={(e) => setCircuitTours(parseInt(e.target.value) || 1)}
-                          className="w-20 px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none text-center" />
+                          className="w-20 px-3 py-2 text-sm text-gray-900 bg-white border border-gray-200 rounded-lg outline-none text-center" />
                       </div>
                     </div>
                   </div>
