@@ -1565,22 +1565,22 @@ export default function EntrainementPage() {
                           <p className="text-xs text-gray-400 mb-2 text-center">{weekDesc}</p>
                         )}
                       <div className={`bg-white border rounded-xl overflow-hidden ${done ? 'border-emerald-300 opacity-80' : 'border-gray-200'}`}>
-                        <div className={`px-5 py-3 flex items-center justify-between ${done ? 'bg-emerald-500' : 'bg-gray-900'}`}>
-                          <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                        <div className={`px-4 sm:px-5 py-3 flex items-center justify-between gap-2 ${done ? 'bg-emerald-500' : 'bg-gray-900'}`}>
+                          <h3 className="text-sm font-bold text-white flex items-center gap-2 truncate min-w-0">
                             {done && <span>✓</span>}
                             {jour.jour}
                           </h3>
-                          <span className="text-xs text-white/70 font-medium">{jour.focus}</span>
+                          <span className="text-xs text-white/70 font-medium flex-shrink-0">{jour.focus}</span>
                         </div>
                         <div className="divide-y divide-gray-100">
                           {jour.exercices.map((exo, ei) => (
-                            <div key={ei} className="px-5 py-3.5 flex items-start gap-4">
+                            <div key={ei} className="px-4 sm:px-5 py-3.5 flex items-start gap-3 sm:gap-4">
                               <span className="w-7 h-7 bg-emerald-50 text-emerald-600 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
                                 {ei + 1}
                               </span>
                               <div className="flex-1 min-w-0">
-                                <p className="text-sm font-semibold text-gray-900">{exo.nom}</p>
-                                <div className="flex gap-3 mt-1">
+                                <p className="text-sm font-semibold text-gray-900 break-words">{exo.nom}</p>
+                                <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1">
                                   <span className="text-xs text-gray-500">{exo.series} séries</span>
                                   <span className="text-xs text-gray-400">×</span>
                                   <span className="text-xs text-gray-500">{exo.reps} reps</span>
@@ -1595,13 +1595,13 @@ export default function EntrainementPage() {
 
                         {/* Boutons Démarrer + Valider */}
                         {!done && (
-                          <div className="px-5 py-4 border-t border-gray-100 flex gap-3">
+                          <div className="px-5 py-4 border-t border-gray-100 flex flex-col sm:flex-row gap-2 sm:gap-3">
                             {wid && (
                               <button
                                 onClick={() => handleStartSession(jour, wid)}
                                 className="flex-1 py-2.5 bg-gray-900 hover:bg-gray-700 text-white text-sm font-semibold rounded-lg transition"
                               >
-                                ▶ Démarrer la séance
+                                ▶ Démarrer
                               </button>
                             )}
                             {wid && (
@@ -1609,7 +1609,7 @@ export default function EntrainementPage() {
                                 onClick={() => handleValidateSession(wid, jour.jour)}
                                 className="flex-1 py-2.5 border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-50 text-sm font-semibold rounded-lg transition"
                               >
-                                ✓ Valider la séance
+                                ✓ Valider
                               </button>
                             )}
                             {!wid && (
@@ -1729,12 +1729,11 @@ export default function EntrainementPage() {
           {(objectifs.length > 0 || joursSelectes.length > 0 || lieu) && (
             <div className="bg-gray-50 border border-gray-200 rounded-xl p-5">
               <p className="text-xs text-gray-400 font-semibold uppercase tracking-widest mb-3">Configuration</p>
-              <table className="w-full text-sm border-separate border-spacing-y-1">
-                <tbody>
+              <div className="space-y-1.5 text-sm">
                   {[
                     ['Objectif', objectifs.length ? objectifs.join(', ') : '--'],
                     ['Temps', tempsSeance || '--'],
-                    ['Durée programme', dureeProgramme ? dureeProgramme.replace('_', ' ') : '--'],
+                    ['Durée', dureeProgramme ? dureeProgramme.replace('_', ' ') : '--'],
                     ['Figures', figuresSelectees.length ? figuresSelectees.map((f) => `${f} (${niveauxFigures[f] || '?'})`).join(', ') : '--'],
                     ['Muscles', musclesCibles.length ? musclesCibles.join(', ') : '--'],
                     ['Fréquence', `${frequence}x / semaine`],
@@ -1742,13 +1741,12 @@ export default function EntrainementPage() {
                     ['Lieu', lieu || '--'],
                     ['Équipement', equipements.length ? equipements.join(', ') : '--'],
                   ].map(([l, v]) => (
-                    <tr key={l}>
-                      <td className="text-gray-400 pr-6 w-28 py-0.5">{l}</td>
-                      <td className="text-gray-900 font-medium py-0.5">{v}</td>
-                    </tr>
+                    <div key={l} className="flex flex-col sm:flex-row sm:gap-4">
+                      <span className="text-gray-400 sm:w-24 flex-shrink-0">{l}</span>
+                      <span className="text-gray-900 font-medium break-words min-w-0">{v}</span>
+                    </div>
                   ))}
-                </tbody>
-              </table>
+                </div>
             </div>
           )}
         </Section>
@@ -1769,10 +1767,10 @@ export default function EntrainementPage() {
                 return (
                   <div key={w.id} className="border border-gray-200 rounded-xl overflow-hidden">
                     <div
-                      className="px-5 py-4 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition"
+                      className="px-4 sm:px-5 py-3 sm:py-4 flex items-center justify-between gap-2 cursor-pointer hover:bg-gray-50 transition"
                       onClick={() => setActiveWorkout(activeWorkout?.id === w.id ? null : w)}
                     >
-                      <div>
+                      <div className="flex-1 min-w-0">
                         {renamingId === w.id ? (
                           <form onSubmit={(e) => { e.preventDefault(); renameWorkout(w.id, renameValue); }} className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                             <input
@@ -1784,8 +1782,8 @@ export default function EntrainementPage() {
                             />
                           </form>
                         ) : (
-                          <div className="flex items-center gap-2">
-                            <p className="text-sm font-semibold text-gray-900">{w.title}</p>
+                          <div className="flex items-center gap-2 min-w-0">
+                            <p className="text-sm font-semibold text-gray-900 truncate">{w.title}</p>
                             <button
                               onClick={(e) => { e.stopPropagation(); setRenamingId(w.id); setRenameValue(w.title); }}
                               className="text-gray-300 hover:text-gray-500 transition"
@@ -1800,16 +1798,16 @@ export default function EntrainementPage() {
                           {w.sharedBy && <span className="ml-2">· Partagé par <span className="font-semibold text-gray-500">{w.sharedBy}</span></span>}
                         </p>
                       </div>
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
                         <button
                           onClick={(e) => { e.stopPropagation(); handleShare(w.id); }}
-                          className="text-xs text-gray-400 hover:text-emerald-500 transition font-medium"
+                          className="text-xs text-gray-400 hover:text-emerald-500 transition font-medium hidden sm:block"
                         >
                           Partager
                         </button>
                         <div className="text-right">
-                          <p className="text-xs text-gray-400">{done}/{total} séances</p>
-                          <div className="w-20 bg-gray-200 rounded-full h-1.5 mt-1">
+                          <p className="text-xs text-gray-400">{done}/{total}</p>
+                          <div className="w-16 sm:w-20 bg-gray-200 rounded-full h-1.5 mt-1">
                             <div className="h-1.5 rounded-full bg-emerald-500" style={{ width: `${pct}%` }} />
                           </div>
                         </div>
@@ -2243,13 +2241,13 @@ export default function EntrainementPage() {
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Défis de la semaine & défis publics</p>
                 <div className="space-y-3">
                   {challenges.filter((c) => c.type !== 'user').map((c) => (
-                    <div key={c.id} className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
+                    <div key={c.id} className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 shadow-sm">
+                      <div className="flex flex-col sm:flex-row items-start gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2 mb-1">
                             <span className="text-base">🏅</span>
-                            <h3 className="text-sm font-bold text-gray-900">{c.title}</h3>
-                            <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-semibold">{'⭐'.repeat(c.difficulty || 1)}</span>
+                            <h3 className="text-sm font-bold text-gray-900 break-words min-w-0">{c.title}</h3>
+                            <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-semibold flex-shrink-0">{'⭐'.repeat(c.difficulty || 1)}</span>
                           </div>
                           <p className="text-sm text-gray-600 mb-1">{c.description}</p>
                           <p className="text-xs text-gray-400">
@@ -2285,12 +2283,12 @@ export default function EntrainementPage() {
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Défis personnels</p>
                 <div className="space-y-3">
                   {challenges.filter((c) => c.type === 'user').map((c) => (
-                    <div key={c.id} className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
+                    <div key={c.id} className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 shadow-sm">
+                      <div className="flex flex-col sm:flex-row items-start gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2 mb-1">
                             <span className="text-base">{c.challengeType === 'circuit' ? '🔁' : '🎯'}</span>
-                            <h3 className="text-sm font-bold text-gray-900">{c.title}</h3>
+                            <h3 className="text-sm font-bold text-gray-900 break-words min-w-0">{c.title}</h3>
                             {c.challengeType === 'circuit' && <span className="text-[10px] bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded-full font-semibold">Circuit</span>}
                             <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-semibold">{'⭐'.repeat(c.difficulty || 1)}</span>
                           </div>

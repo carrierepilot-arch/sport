@@ -38,9 +38,17 @@ export async function POST(request: NextRequest) {
     // Upload to Vercel Blob
     const ext = file.name.split('.').pop() || 'mp4';
     const filename = `perf-${performanceId}-${Date.now()}.${ext}`;
+    
+    const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
+    if (!blobToken) {
+      console.error('BLOB_READ_WRITE_TOKEN not set');
+      return NextResponse.json({ error: 'Configuration stockage manquante' }, { status: 500 });
+    }
+
     const blob = await put(filename, file, {
       access: 'public',
       addRandomSuffix: true,
+      token: blobToken,
     });
 
     // Update performance with video URL
@@ -51,7 +59,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ videoUrl: blob.url });
   } catch (error) {
-    console.error('Video upload error:', error);
-    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('Video upload error:', msg);
+    return NextResponse.json({ error: `Erreur upload: ${msg}` }, { status: 500 });
   }
 }

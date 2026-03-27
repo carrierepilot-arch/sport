@@ -39,6 +39,7 @@ model User {
   challengeCompletions   ChallengeCompletion[]
   createdChallenges      Challenge[]              @relation("CreatedChallenges")
   addedSpots             Spot[]                   @relation("AddedSpots")
+  spotRegulars           SpotRegular[]
 }
 
 model Badge {
@@ -207,12 +208,27 @@ model Spot {
   id           String        @id @default(cuid())
   name         String
   city         String?
+  latitude     Float?
+  longitude    Float?
   addedBy      String?
   status       String        @default("approved")
   createdAt    DateTime      @default(now())
 
   addedByUser  User?         @relation("AddedSpots", fields: [addedBy], references: [id])
   performances Performance[]
+  regulars     SpotRegular[]
+}
+
+model SpotRegular {
+  id        String   @id @default(cuid())
+  spotId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  spot Spot @relation(fields: [spotId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([spotId, userId])
 }
 
 model Performance {
