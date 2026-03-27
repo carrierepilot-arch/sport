@@ -4,8 +4,6 @@ import { fetchExercisesByCategory, fetchExercisesByEquipment, WGER_CATEGORIES, W
 import { verifyToken } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
 // ExerciseDB (RapidAPI) fetch
 async function fetchExerciseDB(muscle: string, limit = 10): Promise<string[]> {
   const key = process.env.RAPIDAPI_KEY;
@@ -217,6 +215,7 @@ ${formatInstruction}`;
     const sessionTokens = Math.max(2000, totalExercices * tokensPerExercice + 800);
     const maxTokens = isMultiWeek ? Math.min(16000, 2000 + nbSemaines * nbJours * targetExercices * tokensPerExercice) : Math.min(8000, sessionTokens);
 
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: prompt }],

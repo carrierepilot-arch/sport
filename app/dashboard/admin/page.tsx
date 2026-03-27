@@ -344,18 +344,19 @@ export default function AdminPage() {
         </div>
 
         {/* Onglets — scrollable */}
-        <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0 mb-6 sm:mb-8">
+        <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0 mb-6 sm:mb-8 scrollbar-none" style={{ WebkitOverflowScrolling: 'touch' }}>
           <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-fit min-w-fit">
             {([
-              { key: 'overview', label: 'Vue globale' },
-              { key: 'users', label: `Utilisateurs (${users.length})` },
-              { key: 'logs', label: `Activité (${logs.length})` },
-              { key: 'performances', label: `🏆 Perfs (${performances.length})` },
-              { key: 'analytics', label: '📊 Analytics' },
-            ] as { key: AdminTab; label: string }[]).map((t) => (
+              { key: 'overview', label: 'Vue globale', shortLabel: 'Global' },
+              { key: 'users', label: `Utilisateurs (${users.length})`, shortLabel: `Users (${users.length})` },
+              { key: 'logs', label: `Activité (${logs.length})`, shortLabel: `Logs (${logs.length})` },
+              { key: 'performances', label: `🏆 Perfs (${performances.length})`, shortLabel: `🏆 (${performances.length})` },
+              { key: 'analytics', label: '📊 Analytics', shortLabel: '📊 Stats' },
+            ] as { key: AdminTab; label: string; shortLabel: string }[]).map((t) => (
               <button key={t.key} onClick={() => setTab(t.key)}
-                className={`px-3 sm:px-5 py-2 rounded-lg text-xs sm:text-sm font-medium transition whitespace-nowrap ${tab === t.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-                {t.label}
+                className={`px-2.5 sm:px-5 py-2 rounded-lg text-xs sm:text-sm font-medium transition whitespace-nowrap ${tab === t.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                <span className="sm:hidden">{t.shortLabel}</span>
+                <span className="hidden sm:inline">{t.shortLabel}</span>
               </button>
             ))}
           </div>
@@ -728,7 +729,8 @@ export default function AdminPage() {
                   <p className="text-xs text-gray-400 mt-0.5">{performances.length} performance{performances.length !== 1 ? 's' : ''} enregistrée{performances.length !== 1 ? 's' : ''}</p>
                 </div>
               </div>
-              <div className="overflow-x-auto">
+              {/* Desktop table */}
+              <div className="hidden md:block overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-gray-50 border-b border-gray-100">
                     <tr>
@@ -736,8 +738,8 @@ export default function AdminPage() {
                       <th className="text-left px-3 py-3 text-xs font-semibold text-gray-400 uppercase">Exercice</th>
                       <th className="text-right px-3 py-3 text-xs font-semibold text-gray-400 uppercase">Score</th>
                       <th className="text-left px-3 py-3 text-xs font-semibold text-gray-400 uppercase">Statut</th>
-                      <th className="text-left px-3 py-3 text-xs font-semibold text-gray-400 uppercase hidden sm:table-cell">Spot</th>
-                      <th className="text-left px-3 py-3 text-xs font-semibold text-gray-400 uppercase hidden md:table-cell">Vidéo</th>
+                      <th className="text-left px-3 py-3 text-xs font-semibold text-gray-400 uppercase">Spot</th>
+                      <th className="text-left px-3 py-3 text-xs font-semibold text-gray-400 uppercase">Vidéo</th>
                       <th className="text-left px-3 py-3 text-xs font-semibold text-gray-400 uppercase hidden lg:table-cell">Date</th>
                       <th className="text-right px-3 py-3 text-xs font-semibold text-gray-400 uppercase">Actions</th>
                     </tr>
@@ -778,8 +780,8 @@ export default function AdminPage() {
                             </span>
                           )}
                         </td>
-                        <td className="px-3 py-3 text-sm text-gray-500 hidden sm:table-cell truncate max-w-[100px]">{p.spot?.name ?? '—'}</td>
-                        <td className="px-3 py-3 hidden md:table-cell">
+                        <td className="px-3 py-3 text-sm text-gray-500 truncate max-w-[100px]">{p.spot?.name ?? '—'}</td>
+                        <td className="px-3 py-3">
                           {p.videoUrl ? (
                             <a href={p.videoUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline">Voir vidéo</a>
                           ) : (
@@ -820,6 +822,57 @@ export default function AdminPage() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+              {/* Mobile cards */}
+              <div className="md:hidden divide-y divide-gray-50">
+                {performances.length === 0 && (
+                  <p className="px-4 py-8 text-center text-sm text-gray-400">Aucune performance</p>
+                )}
+                {performances.map((p) => (
+                  <div key={p.id} className="px-4 py-3 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-medium text-gray-900 truncate">{p.user.pseudo ? `@${p.user.pseudo}` : p.user.name ?? p.user.email}</p>
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${
+                        p.status === 'validated' ? 'bg-green-100 text-green-700' :
+                        p.status === 'rejected' ? 'bg-red-100 text-red-600' :
+                        'bg-amber-100 text-amber-700'
+                      }`}>
+                        {p.status === 'validated' ? 'Validé' : p.status === 'rejected' ? 'Rejeté' : 'En attente'}
+                      </span>
+                    </div>
+                    {editingPerf === p.id ? (
+                      <div className="flex gap-2 items-center flex-wrap">
+                        <input type="number" step="any" value={editScore} onChange={e => setEditScore(e.target.value)}
+                          className="w-24 px-2 py-1 border border-gray-300 rounded text-sm text-gray-900" />
+                        <select value={editStatus} onChange={e => setEditStatus(e.target.value)}
+                          className="px-2 py-1 border border-gray-300 rounded text-sm text-gray-900">
+                          <option value="pending">En attente</option>
+                          <option value="validated">Validé</option>
+                          <option value="rejected">Rejeté</option>
+                        </select>
+                        <button onClick={() => updatePerf(p.id, Number(editScore), editStatus)}
+                          disabled={actionLoading === p.id}
+                          className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50">✓</button>
+                        <button onClick={() => setEditingPerf(null)}
+                          className="px-3 py-1 text-xs bg-gray-200 text-gray-600 rounded hover:bg-gray-300">✕</button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-xs text-gray-500">
+                          {p.exercise} · <span className="font-semibold text-gray-900">{p.score} {p.unit}</span>
+                          {p.spot && <> · {p.spot.name}</>}
+                          {p.videoUrl && <> · <a href={p.videoUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600">vidéo</a></>}
+                        </div>
+                        <div className="flex gap-1 flex-shrink-0">
+                          <button onClick={() => { setEditingPerf(p.id); setEditScore(String(p.score)); setEditStatus(p.status); }}
+                            className="px-2 py-1 text-xs bg-blue-50 text-blue-600 rounded hover:bg-blue-100">✏️</button>
+                          <button onClick={() => deletePerf(p.id)} disabled={actionLoading === p.id}
+                            className="px-2 py-1 text-xs bg-red-50 text-red-600 rounded hover:bg-red-100 disabled:opacity-50">🗑</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
 

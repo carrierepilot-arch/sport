@@ -257,23 +257,37 @@ export default function ReseauPage() {
         const { performance } = await res.json();
         // Upload video if selected
         if (perfVideoFile && performance?.id) {
-          setVideoUploading(performance.id);
-          const fd = new FormData();
-          fd.append('video', perfVideoFile);
-          fd.append('performanceId', performance.id);
-          const token = localStorage.getItem('token');
-          await fetch('/api/performances/upload-video', {
-            method: 'POST',
-            headers: token ? { Authorization: `Bearer ${token}` } : {},
-            body: fd,
-          });
-          setVideoUploading(null);
+          if (perfVideoFile.size > 50 * 1024 * 1024) {
+            alert('Vidéo trop volumineuse (max 50 MB)');
+          } else {
+            setVideoUploading(performance.id);
+            try {
+              const fd = new FormData();
+              fd.append('video', perfVideoFile);
+              fd.append('performanceId', performance.id);
+              const token = localStorage.getItem('token');
+              const vRes = await fetch('/api/performances/upload-video', {
+                method: 'POST',
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
+                body: fd,
+              });
+              if (!vRes.ok) {
+                const vData = await vRes.json().catch(() => ({}));
+                alert(vData.error || 'Erreur upload vidéo');
+              }
+            } catch {
+              alert('Erreur réseau lors de l\'upload vidéo');
+            }
+            setVideoUploading(null);
+          }
         }
         setPerfScore(''); setPerfVideoFile(null); setShowAddPerf(false);
         await chargerPerformances(spotActif);
         await chargerSpots();
       }
-    } catch { /* silencieux */ }
+    } catch {
+      alert('Erreur lors de l\'ajout de la performance');
+    }
     setPerfSubmitting(false);
   };
 
@@ -288,6 +302,10 @@ export default function ReseauPage() {
   };
 
   const uploadVideoForPerf = async (perfId: string, file: File) => {
+    if (file.size > 50 * 1024 * 1024) {
+      alert('Vidéo trop volumineuse (max 50 MB)');
+      return;
+    }
     setVideoUploading(perfId);
     try {
       const fd = new FormData();
@@ -299,8 +317,15 @@ export default function ReseauPage() {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: fd,
       });
-      if (res.ok && spotActif) await chargerPerformances(spotActif);
-    } catch { /* silencieux */ }
+      if (res.ok) {
+        if (spotActif) await chargerPerformances(spotActif);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || 'Erreur lors de l\'upload');
+      }
+    } catch {
+      alert('Erreur réseau lors de l\'upload');
+    }
     setVideoUploading(null);
   };
 
@@ -1293,14 +1318,14 @@ export default function ReseauPage() {
               <div className="space-y-4">
 
                 {/* Header spot + bouton ajouter */}
-                <div className="bg-white border border-gray-200 rounded-xl px-5 py-4 flex items-center justify-between">
-                  <div>
-                    <h2 className="text-sm font-bold text-gray-900">{spots.find((s) => s.id === spotActif)?.name}</h2>
+                <div className="bg-white border border-gray-200 rounded-xl px-4 sm:px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <h2 className="text-sm font-bold text-gray-900 truncate">{spots.find((s) => s.id === spotActif)?.name}</h2>
                     <p className="text-xs text-gray-400 mt-0.5">Classement par exercice · validé par la communauté</p>
                   </div>
                   <button
                     onClick={() => setShowAddPerf(!showAddPerf)}
-                    className="px-4 py-2 bg-gray-900 hover:bg-gray-700 text-white text-sm font-semibold rounded-lg transition"
+                    className="w-full sm:w-auto px-4 py-2 bg-gray-900 hover:bg-gray-700 text-white text-sm font-semibold rounded-lg transition flex-shrink-0"
                   >
                     {showAddPerf ? '✕ Annuler' : '+ Mon record'}
                   </button>
@@ -1395,25 +1420,23 @@ export default function ReseauPage() {
                               const acceptedFriends = amis.filter((a) => a.statut === 'accepte');
                               return (
                                 <div key={p.id}>
-                                  <div className={`flex items-center justify-between px-5 py-3 ${ isOwn ? 'bg-gray-50' : '' }`}>
-                                    <div className="flex items-center gap-3">
-                                      <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
-                                        idx === 0 ? 'bg-yellow-100 text-yellow-700' :
-                                        idx === 1 ? 'bg-gray-200 text-gray-600' :
-                                        idx === 2 ? 'bg-orange-100 text-orange-600' :
-                                        'bg-gray-100 text-gray-400'
-                                      }`}>
-                                        {idx + 1}
-                                      </div>
-                                      <div>
-                                        <p className="text-sm font-semibold text-gray-900">
+                                  <div className={`px-4 sm:px-5 py-3 ${ isOwn ? 'bg-gray-50' : '' }`}>
+                                    <div className="flex items-center justify-between gap-2">
+                                      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                                          idx === 0 ? 'bg-yellow-100 text-yellow-700' :
+                                          idx === 1 ? 'bg-gray-200 text-gray-600' :
+                                          idx === 2 ? 'bg-orange-100 text-orange-600' :
+                                          'bg-gray-100 text-gray-400'
+                                        }`}>
+                                          {idx + 1}
+                                        </div>
+                                        <p className="text-sm font-semibold text-gray-900 truncate">
                                           @{p.user.pseudo}
                                           {isOwn && <span className="ml-1 text-xs text-gray-400">(moi)</span>}
                                         </p>
                                       </div>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                      <div className="text-right">
+                                      <div className="text-right flex-shrink-0">
                                         <p className="text-base font-bold text-gray-900">
                                           {p.score}&nbsp;<span className="text-xs font-normal text-gray-400">{p.unit}</span>
                                         </p>
@@ -1421,40 +1444,52 @@ export default function ReseauPage() {
                                           <span className="text-xs text-emerald-600 font-medium">✓ Validé</span>
                                         ) : (
                                           <span className="text-xs text-amber-500">
-                                            {acceptedValidations.length}/2 confirmation{acceptedValidations.length > 1 ? 's' : ''}
+                                            {acceptedValidations.length}/2 conf.
                                           </span>
                                         )}
                                       </div>
-                                      {/* Video badge or upload */}
-                                      {p.videoUrl ? (
+                                    </div>
+                                    {/* Action buttons — second row on mobile */}
+                                    {isOwn && (
+                                      <div className="flex items-center gap-2 mt-2 ml-9 sm:ml-10 flex-wrap">
+                                        {p.videoUrl ? (
+                                          <a href={p.videoUrl} target="_blank" rel="noopener noreferrer"
+                                            className="px-2 py-1 text-xs bg-blue-50 text-blue-600 rounded-lg font-medium hover:bg-blue-100">
+                                            🎥 Vidéo
+                                          </a>
+                                        ) : (
+                                          <label className="px-2 py-1 text-xs bg-gray-100 text-gray-500 rounded-lg font-medium hover:bg-gray-200 cursor-pointer">
+                                            {videoUploading === p.id ? '⏳...' : '📹 + Vidéo'}
+                                            <input type="file" accept="video/mp4,video/webm,video/quicktime" className="hidden"
+                                              onChange={(e) => { if (e.target.files?.[0]) uploadVideoForPerf(p.id, e.target.files[0]); }} />
+                                          </label>
+                                        )}
+                                        {p.status !== 'validated' && (
+                                          <button
+                                            onClick={() => {
+                                              setPerfReqOpen(isReqOpen ? null : p.id);
+                                              setPerfReqSelected(new Set());
+                                            }}
+                                            className={`px-2 py-1 text-xs font-semibold rounded-lg transition border ${
+                                              isReqOpen
+                                                ? 'bg-gray-100 border-gray-300 text-gray-700'
+                                                : 'border-gray-200 text-gray-600 hover:border-amber-400 hover:text-amber-600'
+                                            }`}
+                                          >
+                                            {isReqOpen ? '✕ Fermer' : '📋 Validation'}
+                                          </button>
+                                        )}
+                                      </div>
+                                    )}
+                                    {/* Non-owner video badge */}
+                                    {!isOwn && p.videoUrl && (
+                                      <div className="mt-2 ml-9 sm:ml-10">
                                         <a href={p.videoUrl} target="_blank" rel="noopener noreferrer"
-                                          className="px-2 py-1 text-xs bg-blue-50 text-blue-600 rounded-lg font-medium hover:bg-blue-100 flex-shrink-0">
+                                          className="px-2 py-1 text-xs bg-blue-50 text-blue-600 rounded-lg font-medium hover:bg-blue-100">
                                           🎥 Vidéo
                                         </a>
-                                      ) : isOwn ? (
-                                        <label className="px-2 py-1 text-xs bg-gray-100 text-gray-500 rounded-lg font-medium hover:bg-gray-200 cursor-pointer flex-shrink-0">
-                                          {videoUploading === p.id ? '⏳...' : '📹 + Vidéo'}
-                                          <input type="file" accept="video/mp4,video/webm,video/quicktime" className="hidden"
-                                            onChange={(e) => { if (e.target.files?.[0]) uploadVideoForPerf(p.id, e.target.files[0]); }} />
-                                        </label>
-                                      ) : null}
-                                      {/* Owner: "Demander validation" button for pending perfs */}
-                                      {isOwn && p.status !== 'validated' && (
-                                        <button
-                                          onClick={() => {
-                                            setPerfReqOpen(isReqOpen ? null : p.id);
-                                            setPerfReqSelected(new Set());
-                                          }}
-                                          className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition border ${
-                                            isReqOpen
-                                              ? 'bg-gray-100 border-gray-300 text-gray-700'
-                                              : 'border-gray-200 text-gray-600 hover:border-amber-400 hover:text-amber-600'
-                                          }`}
-                                        >
-                                          {isReqOpen ? '✕ Fermer' : '📋 Demander validation'}
-                                        </button>
-                                      )}
-                                    </div>
+                                      </div>
+                                    )}
                                   </div>
                                   {/* Inline validation request picker */}
                                   {isReqOpen && (

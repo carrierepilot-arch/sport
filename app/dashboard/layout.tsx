@@ -5,7 +5,6 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useState, useEffect, useCallback } from 'react';
 
 const NAV_ITEMS = [
-  { href: '/dashboard',               label: 'Accueil',      icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
   { href: '/dashboard/profil',        label: 'Profil',       icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
   { href: '/dashboard/entrainement',  label: 'Entrainement', icon: 'M13 10V3L4 14h7v7l9-11h-7z' },
   { href: '/dashboard/reseau',        label: 'Réseau',       icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z' },
@@ -100,7 +99,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Nav */}
         <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
           {NAV_ITEMS.map((item) => {
-            const active = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
+            const active = pathname === item.href || pathname.startsWith(item.href + '/');
             const isReseau = item.href === '/dashboard/reseau';
             return (
               <Link
@@ -157,7 +156,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* ── BOTTOM NAV (mobile only) ── */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-20 bg-white border-t border-gray-200 flex items-stretch safe-area-bottom">
         {NAV_ITEMS.map((item) => {
-          const active = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
+          const active = pathname === item.href || pathname.startsWith(item.href + '/');
           const isReseau = item.href === '/dashboard/reseau';
           return (
             <Link

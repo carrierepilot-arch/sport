@@ -55,3 +55,6 @@ set-admin.sql
 check-admin.sql
 
 .vercel
+
+.vercel
+.env*.local

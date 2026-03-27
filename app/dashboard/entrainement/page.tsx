@@ -2099,10 +2099,10 @@ export default function EntrainementPage() {
                 {/* Visibility selector */}
                 <div>
                   <p className="text-xs text-gray-500 font-medium mb-1">Visibilité</p>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
                     {([{ key: 'friends' as const, label: '👥 Amis', desc: 'Vos amis' }, { key: 'private' as const, label: '🔒 Privé', desc: 'Vous seul' }, { key: 'public' as const, label: '🌍 Public', desc: 'Tout le monde' }]).map((v) => (
                       <button key={v.key} onClick={() => setNewChallVisibility(v.key)}
-                        className={`flex-1 py-2 rounded-lg text-xs font-semibold transition border-2 ${newChallVisibility === v.key ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 text-gray-600 hover:border-gray-400'}`}>
+                        className={`flex-1 min-w-[80px] py-2 rounded-lg text-xs font-semibold transition border-2 ${newChallVisibility === v.key ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 text-gray-600 hover:border-gray-400'}`}>
                         {v.label}
                       </button>
                     ))}
@@ -2124,10 +2124,10 @@ export default function EntrainementPage() {
                 {/* Difficulty selector */}
                 <div>
                   <p className="text-xs text-gray-500 font-medium mb-1">Difficulté</p>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
                     {([1, 2, 3] as const).map((d) => (
                       <button key={d} onClick={() => setNewChallDifficulty(d)}
-                        className={`flex-1 py-2 rounded-lg text-xs font-semibold transition border-2 ${newChallDifficulty === d ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 text-gray-600 hover:border-gray-400'}`}>
+                        className={`flex-1 min-w-[90px] py-2 rounded-lg text-[11px] sm:text-xs font-semibold transition border-2 ${newChallDifficulty === d ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 text-gray-600 hover:border-gray-400'}`}>
                         {'⭐'.repeat(d)} {d === 1 ? 'Facile' : d === 2 ? 'Moyen' : 'Difficile'} ({d === 1 ? '25' : d === 2 ? '50' : '100'} XP)
                       </button>
                     ))}
@@ -2144,24 +2144,26 @@ export default function EntrainementPage() {
                 />
 
                 {newChallType === 'simple' && (
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <input
                       type="text" placeholder="Exercice (ex: tractions)" value={newChallExercise} onChange={(e) => setNewChallExercise(e.target.value)}
-                      className="flex-1 px-3 py-2 text-sm text-gray-900 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none"
+                      className="flex-1 min-w-0 px-3 py-2 text-sm text-gray-900 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none"
                     />
-                    <input
-                      type="number" placeholder="Objectif" value={newChallTarget} onChange={(e) => setNewChallTarget(e.target.value)}
-                      className="w-24 px-3 py-2 text-sm text-gray-900 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none"
-                    />
-                    <select
-                      value={newChallUnit} onChange={(e) => setNewChallUnit(e.target.value)}
-                      className="px-3 py-2 text-sm text-gray-900 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none"
-                    >
+                    <div className="flex gap-2">
+                      <input
+                        type="number" placeholder="Objectif" value={newChallTarget} onChange={(e) => setNewChallTarget(e.target.value)}
+                        className="w-24 px-3 py-2 text-sm text-gray-900 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none"
+                      />
+                      <select
+                        value={newChallUnit} onChange={(e) => setNewChallUnit(e.target.value)}
+                        className="px-3 py-2 text-sm text-gray-900 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none"
+                      >
                       <option value="reps">répétitions</option>
                       <option value="kg">kg</option>
                       <option value="min">minutes</option>
                       <option value="km">km</option>
                     </select>
+                    </div>
                   </div>
                 )}
 
