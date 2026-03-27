@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { fetchExercisesByCategory, fetchExercisesByEquipment, WGER_CATEGORIES, WGER_EQUIPMENT } from '@/lib/wger';
+import { verifyToken } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -223,6 +225,38 @@ ${formatInstruction}`;
     });
 
     const programme = completion.choices[0]?.message?.content ?? '';
+
+    // ── Track real API usage ──
+    const usage = completion.usage;
+    const promptTokens = usage?.prompt_tokens ?? 0;
+    const completionTokens = usage?.completion_tokens ?? 0;
+    const totalTokens = usage?.total_tokens ?? (promptTokens + completionTokens);
+    const estimatedCost = totalTokens * 0.00000015; // gpt-4o-mini pricing ~$0.15/1M tokens
+
+    // Log activity if user is authenticated
+    try {
+      const token = req.headers.get('authorization')?.replace('Bearer ', '');
+      if (token) {
+        const payload = verifyToken(token);
+        if (payload) {
+          await prisma.activityLog.create({
+            data: {
+              userId: payload.userId,
+              action: 'ai_api_call',
+              details: JSON.stringify({
+                model: 'gpt-4o-mini',
+                promptTokens,
+                completionTokens,
+                totalTokens,
+                estimatedCost: parseFloat(estimatedCost.toFixed(6)),
+                maxTokensRequested: maxTokens,
+              }),
+            },
+          });
+        }
+      }
+    } catch { /* don't fail the request if logging fails */ }
+
     return NextResponse.json({ programme });
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);

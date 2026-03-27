@@ -917,7 +917,7 @@ export default function EntrainementPage() {
     try {
       const res = await fetch('/api/generate-workout', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(localStorage.getItem('token') ? { Authorization: `Bearer ${localStorage.getItem('token')}` } : {}) },
         body: JSON.stringify({ objectif: objectifs.join(', ') || 'general', frequence, joursSelectes, lieu, equipements, equipConfig, figuresSelectees, niveauxFigures, musclesCibles, tempsSeance, dureeProgramme }),
       });
       clearInterval(progressInterval);
@@ -2078,14 +2078,14 @@ export default function EntrainementPage() {
         {entrainementTab === 'defis' && (
           <div className="space-y-4">
             {/* Header + create button */}
-            <div className="flex items-start justify-between">
+            <div className="flex flex-col sm:flex-row items-start sm:justify-between gap-2">
               <div>
                 <h2 className="text-lg font-bold text-gray-900">🏆 Défis sportifs</h2>
-                <p className="text-sm text-gray-500">Défis de la semaine + vos défis personnels partagés avec vos amis.</p>
+                <p className="text-xs sm:text-sm text-gray-500">Défis de la semaine + vos défis personnels.</p>
               </div>
               <button
                 onClick={() => setShowCreateChallenge((v) => !v)}
-                className="px-4 py-2 bg-gray-900 hover:bg-gray-700 text-white text-xs font-semibold rounded-xl transition shrink-0"
+                className="w-full sm:w-auto px-4 py-2 bg-gray-900 hover:bg-gray-700 text-white text-xs font-semibold rounded-xl transition shrink-0"
               >
                 {showCreateChallenge ? '✕ Annuler' : '+ Créer un défi'}
               </button>
@@ -2169,7 +2169,7 @@ export default function EntrainementPage() {
                   <div className="space-y-3 bg-white border border-gray-200 rounded-xl p-4">
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Exercices du circuit</p>
                     {circuitExercises.map((ex, i) => (
-                      <div key={i} className="flex gap-2 items-center">
+                      <div key={i} className="flex flex-wrap gap-2 items-center">
                         <input
                           type="text" placeholder={`Exercice ${i + 1}`} value={ex.nom}
                           onChange={(e) => {
@@ -2177,22 +2177,24 @@ export default function EntrainementPage() {
                             updated[i] = { ...updated[i], nom: e.target.value };
                             setCircuitExercises(updated);
                           }}
-                          className="flex-1 px-3 py-2 text-sm text-gray-900 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none"
+                          className="flex-1 min-w-0 px-3 py-2 text-sm text-gray-900 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none"
                         />
-                        <input
-                          type="number" min={1} value={ex.reps}
-                          onChange={(e) => {
-                            const updated = [...circuitExercises];
-                            updated[i] = { ...updated[i], reps: parseInt(e.target.value) || 1 };
-                            setCircuitExercises(updated);
-                          }}
-                          className="w-20 px-3 py-2 text-sm text-gray-900 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none text-center"
-                        />
-                        <span className="text-xs text-gray-400">reps</span>
-                        {circuitExercises.length > 1 && (
-                          <button onClick={() => setCircuitExercises(circuitExercises.filter((_, idx) => idx !== i))}
-                            className="text-red-400 hover:text-red-600 text-sm">✕</button>
-                        )}
+                        <div className="flex gap-2 items-center">
+                          <input
+                            type="number" min={1} value={ex.reps}
+                            onChange={(e) => {
+                              const updated = [...circuitExercises];
+                              updated[i] = { ...updated[i], reps: parseInt(e.target.value) || 1 };
+                              setCircuitExercises(updated);
+                            }}
+                            className="w-16 sm:w-20 px-2 py-2 text-sm text-gray-900 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none text-center"
+                          />
+                          <span className="text-xs text-gray-400">reps</span>
+                          {circuitExercises.length > 1 && (
+                            <button onClick={() => setCircuitExercises(circuitExercises.filter((_, idx) => idx !== i))}
+                              className="text-red-400 hover:text-red-600 text-sm">✕</button>
+                          )}
+                        </div>
                       </div>
                     ))}
                     <button

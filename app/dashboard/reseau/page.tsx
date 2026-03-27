@@ -130,10 +130,12 @@ export default function ReseauPage() {
   const [newSpotCity,    setNewSpotCity]    = useState('');
   const [spotSubmitting, setSpotSubmitting] = useState(false);
   // Validation request state
-  const [perfReqOpen,     setPerfReqOpen]     = useState<string | null>(null); // performanceId whose panel is open
+  const [perfReqOpen,     setPerfReqOpen]     = useState<string | null>(null);
   const [perfReqSelected, setPerfReqSelected] = useState<Set<string>>(new Set());
   const [sendingValReq,   setSendingValReq]   = useState(false);
   const [valRequestsIn,   setValRequestsIn]   = useState<PerfValidReq[]>([]);
+  const [perfVideoFile,   setPerfVideoFile]   = useState<File | null>(null);
+  const [videoUploading,  setVideoUploading]  = useState<string | null>(null);
   const [mobileMsgView, setMobileMsgView] = useState<'list' | 'chat'>('list');
   const [convType, setConvType] = useState<'dm' | 'group'>('dm');
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
@@ -252,7 +254,22 @@ export default function ReseauPage() {
         body: JSON.stringify({ spotId: spotActif, exercise: perfExercise, score: parseFloat(perfScore) }),
       });
       if (res.ok) {
-        setPerfScore(''); setShowAddPerf(false);
+        const { performance } = await res.json();
+        // Upload video if selected
+        if (perfVideoFile && performance?.id) {
+          setVideoUploading(performance.id);
+          const fd = new FormData();
+          fd.append('video', perfVideoFile);
+          fd.append('performanceId', performance.id);
+          const token = localStorage.getItem('token');
+          await fetch('/api/performances/upload-video', {
+            method: 'POST',
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+            body: fd,
+          });
+          setVideoUploading(null);
+        }
+        setPerfScore(''); setPerfVideoFile(null); setShowAddPerf(false);
         await chargerPerformances(spotActif);
         await chargerSpots();
       }
@@ -268,6 +285,23 @@ export default function ReseauPage() {
       });
       if (res.ok && spotActif) await chargerPerformances(spotActif);
     } catch { /* silencieux */ }
+  };
+
+  const uploadVideoForPerf = async (perfId: string, file: File) => {
+    setVideoUploading(perfId);
+    try {
+      const fd = new FormData();
+      fd.append('video', file);
+      fd.append('performanceId', perfId);
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/performances/upload-video', {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: fd,
+      });
+      if (res.ok && spotActif) await chargerPerformances(spotActif);
+    } catch { /* silencieux */ }
+    setVideoUploading(null);
   };
 
   const chargerValRequests = useCallback(async () => {
@@ -651,7 +685,7 @@ export default function ReseauPage() {
 
         {/* ── MESSAGES ── */}
         {tab === 'messages' && (
-          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col md:flex-row h-[calc(100vh-220px)] min-h-[400px] max-h-[700px] shadow-sm">
+          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col md:flex-row h-[calc(100vh-220px)] min-h-[300px] sm:min-h-[400px] max-h-[700px] shadow-sm">
             <div className={`flex-col flex-shrink-0 md:w-80 border-b md:border-b-0 md:border-r border-gray-200 bg-white ${mobileMsgView === 'chat' ? 'hidden md:flex' : 'flex w-full'}`}>
               <div className="p-4 border-b border-gray-200 bg-gradient-to-r from-emerald-600 to-teal-600">
                 <h2 className="text-sm font-bold text-white">💬 Conversations</h2>
@@ -723,7 +757,7 @@ export default function ReseauPage() {
                 <>
                   <div className="px-4 py-3 sm:px-5 sm:py-4 border-b border-gray-200 bg-gradient-to-r from-emerald-600 to-teal-600 flex items-center gap-2 sm:gap-3">
                     <button
-                      className="md:hidden flex-shrink-0 p-1 -ml-1 text-white/80 hover:text-white transition"
+                      className="md:hidden flex-shrink-0 p-2 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition"
                       onClick={() => setMobileMsgView('list')}
                     >
                       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -731,13 +765,13 @@ export default function ReseauPage() {
                       </svg>
                     </button>
                     <Avatar letter={(convEnCours?.pseudo ?? amis.find((a) => a.friendId === convActive)?.pseudo ?? '?')[0]} />
-                    <div>
-                      <p className="text-sm font-semibold text-white">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-white truncate">
                         @{convEnCours?.pseudo ?? amis.find((a) => a.friendId === convActive)?.pseudo ?? 'ami'}
                       </p>
                       <p className="text-xs text-emerald-100">En ligne</p>
                     </div>
-                    <span className="ml-auto text-xs text-emerald-100 flex items-center gap-1"><span className="w-1.5 h-1.5 bg-emerald-300 rounded-full animate-pulse"></span> Sync</span>
+                    <span className="ml-auto text-xs text-emerald-100 flex items-center gap-1 flex-shrink-0"><span className="w-1.5 h-1.5 bg-emerald-300 rounded-full animate-pulse"></span> Sync</span>
                   </div>
                   <div className="flex-1 p-4 sm:p-5 overflow-y-auto flex flex-col gap-2" style={{backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%2310b981\' fill-opacity=\'0.04\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")', backgroundColor: '#f0fdf4'}}>
                     {chat.length === 0 && (
@@ -850,7 +884,7 @@ export default function ReseauPage() {
                 <>
                   <div className="px-4 py-3 sm:px-5 sm:py-4 border-b border-gray-200 bg-gradient-to-r from-emerald-600 to-teal-600 flex items-center gap-2 sm:gap-3">
                     <button
-                      className="md:hidden flex-shrink-0 p-1 -ml-1 text-white/80 hover:text-white transition"
+                      className="md:hidden flex-shrink-0 p-2 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition"
                       onClick={() => setMobileMsgView('list')}
                     >
                       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -862,11 +896,11 @@ export default function ReseauPage() {
                         <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                       </svg>
                     </div>
-                    <div>
-                      <p className="text-sm font-semibold text-white">{activeGroup.name}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-white truncate">{activeGroup.name}</p>
                       <p className="text-xs text-emerald-100">{activeGroup.members.length} membre{activeGroup.members.length > 1 ? 's' : ''}</p>
                     </div>
-                    <span className="ml-auto text-xs text-emerald-100 flex items-center gap-1"><span className="w-1.5 h-1.5 bg-emerald-300 rounded-full animate-pulse"></span> Sync</span>
+                    <span className="ml-auto text-xs text-emerald-100 flex items-center gap-1 flex-shrink-0"><span className="w-1.5 h-1.5 bg-emerald-300 rounded-full animate-pulse"></span> Sync</span>
                   </div>
                   <div className="flex-1 p-4 sm:p-5 overflow-y-auto flex flex-col gap-2" style={{backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%2310b981\' fill-opacity=\'0.04\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")', backgroundColor: '#f0fdf4'}}>
                     {activeGroupMsgs.length === 0 && (
@@ -1309,12 +1343,22 @@ export default function ReseauPage() {
                         />
                       </div>
                     </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Preuve vidéo (optionnel)</label>
+                      <input
+                        type="file"
+                        accept="video/mp4,video/webm,video/quicktime"
+                        onChange={(e) => setPerfVideoFile(e.target.files?.[0] ?? null)}
+                        className="w-full text-sm text-gray-700 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200"
+                      />
+                      {perfVideoFile && <p className="text-xs text-gray-400 mt-1">{(perfVideoFile.size / 1024 / 1024).toFixed(1)} MB · {perfVideoFile.name}</p>}
+                    </div>
                     <button
                       onClick={ajouterPerformance}
                       disabled={perfSubmitting || !perfScore}
                       className="w-full py-2.5 bg-gray-900 hover:bg-gray-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition"
                     >
-                      {perfSubmitting ? 'Enregistrement...' : 'Enregistrer ma performance'}
+                      {perfSubmitting ? (videoUploading ? 'Upload vidéo...' : 'Enregistrement...') : 'Enregistrer ma performance'}
                     </button>
                   </div>
                 )}
@@ -1381,6 +1425,19 @@ export default function ReseauPage() {
                                           </span>
                                         )}
                                       </div>
+                                      {/* Video badge or upload */}
+                                      {p.videoUrl ? (
+                                        <a href={p.videoUrl} target="_blank" rel="noopener noreferrer"
+                                          className="px-2 py-1 text-xs bg-blue-50 text-blue-600 rounded-lg font-medium hover:bg-blue-100 flex-shrink-0">
+                                          🎥 Vidéo
+                                        </a>
+                                      ) : isOwn ? (
+                                        <label className="px-2 py-1 text-xs bg-gray-100 text-gray-500 rounded-lg font-medium hover:bg-gray-200 cursor-pointer flex-shrink-0">
+                                          {videoUploading === p.id ? '⏳...' : '📹 + Vidéo'}
+                                          <input type="file" accept="video/mp4,video/webm,video/quicktime" className="hidden"
+                                            onChange={(e) => { if (e.target.files?.[0]) uploadVideoForPerf(p.id, e.target.files[0]); }} />
+                                        </label>
+                                      ) : null}
                                       {/* Owner: "Demander validation" button for pending perfs */}
                                       {isOwn && p.status !== 'validated' && (
                                         <button

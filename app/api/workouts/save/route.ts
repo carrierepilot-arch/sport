@@ -23,6 +23,15 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // Log workout generation
+    await prisma.activityLog.create({
+      data: {
+        userId: payload.userId,
+        action: 'workout_generated',
+        details: title ?? 'Séance sauvegardée',
+      },
+    });
+
     return NextResponse.json({ success: true, workout });
   } catch (error) {
     console.error('Save workout error:', error);
