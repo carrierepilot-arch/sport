@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sport - Loading...</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .container {
+      text-align: center;
+      color: white;
+    }
+    .spinner {
+      border: 4px solid rgba(255, 255, 255, 0.3);
+      border-top: 4px solid white;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    h1 { margin: 0; font-size: 24px; }
+    p { margin: 10px 0 0; opacity: 0.9; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="spinner"></div>
+    <h1>Sport</h1>
+    <p>Démarrage de l'application...</p>
+    <p style="font-size: 12px; margin-top: 40px; opacity: 0.7;">v1.0.0 - Offline-First</p>
+  </div>
+  
+  <script>
+    // Redirect to Next.js server once it's ready
+    (function checkServer() {
+      const timeoutId = setTimeout(() => {
+        // Try to load the app
+        const protocol = window.location.protocol.includes('https') ? 'https' : 'http';
+        window.location.href = `${protocol}://localhost:3000/`;
+      }, 500);
+    })();
+  </script>
+</body>
+</html>

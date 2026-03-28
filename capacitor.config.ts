@@ -3,10 +3,14 @@ import type { CapacitorConfig } from '@capacitor/cli';
 const config: CapacitorConfig = {
   appId: 'com.sport.fitness',
   appName: 'Sport',
-  webDir: 'public',  // PWA files served from public/
+  webDir: 'public',
+  // Configure server for local development
   server: {
     androidScheme: 'https',
-    url: 'https://sport-alpha-lake.vercel.app',  // Production URL
+    // Point to local Next.js server running on device
+    // This allows full offline capability with API routes
+    url: 'http://localhost:3000',
+    cleartext: true,
   },
   plugins: {
     SplashScreen: {
