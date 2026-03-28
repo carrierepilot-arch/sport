@@ -5,12 +5,17 @@
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
+    "build:mobile": "npm run build && npx cap sync",
     "start": "next start",
     "lint": "eslint",
     "postinstall": "prisma generate",
     "scrape:exercises": "node scripts/scrape-exercises-web.mjs",
     "import:exercises": "tsx scripts/import-scraped-exercises.ts",
-    "sync:exercises": "npm run scrape:exercises && npm run import:exercises -- --min-quality=5"
+    "sync:exercises": "npm run scrape:exercises && npm run import:exercises -- --min-quality=5",
+    "cap": "npx cap",
+    "cap:sync": "npx cap sync",
+    "cap:open": "npx cap open",
+    "cap:build": "npx cap build"
   },
   "dependencies": {
     "@libsql/client": "^0.17.2",
@@ -38,6 +43,8 @@
     "react-dom": "19.2.4"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.3.0",
+    "@capacitor/core": "^8.3.0",
     "@tailwindcss/postcss": "^4",
     "@types/fluent-ffmpeg": "^2.1.28",
     "@types/node": "^20",
