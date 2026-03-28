@@ -14,11 +14,13 @@ model User {
   name      String?
   pseudo    String?
   isAdmin   Boolean  @default(false)
+  adminLevel Int     @default(0)
   suspended Boolean  @default(false)
   level     String   @default("intermediaire")
   xp            Int      @default(0)
   equipmentData Json?
   physicalData  Json?    // Array of { date, weight, height, bodyFat, chest, waist, hips, bicepsL, bicepsR, thighL, thighR }
+  levelTestData Json?
   createdAt     DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -40,6 +42,11 @@ model User {
   createdChallenges      Challenge[]              @relation("CreatedChallenges")
   addedSpots             Spot[]                   @relation("AddedSpots")
   spotRegulars           SpotRegular[]
+  spotFavorites          SpotFavorite[]
+  apiLogs                ApiLog[]
+  reportsFiled           Report[]                @relation("ReportsFiled")
+  reportsReceived        Report[]                @relation("ReportsReceived")
+  suggestions            Suggestion[]
 }
 
 model Badge {
@@ -217,6 +224,20 @@ model Spot {
   addedByUser  User?         @relation("AddedSpots", fields: [addedBy], references: [id])
   performances Performance[]
   regulars     SpotRegular[]
+  favorites    SpotFavorite[]
+}
+
+model SpotFavorite {
+  id        String   @id @default(cuid())
+  spotId     String
+  userId     String
+  createdAt  DateTime @default(now())
+
+  spot Spot @relation(fields: [spotId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([spotId, userId])
+  @@index([userId])
 }
 
 model SpotRegular {
@@ -240,11 +261,57 @@ model Performance {
   unit      String   @default("reps")
   status    String   @default("pending")
   videoUrl  String?
+  videoStoragePath String?
   createdAt DateTime @default(now())
 
   user        User                    @relation(fields: [userId], references: [id])
   spot        Spot                    @relation(fields: [spotId], references: [id])
   validations PerformanceValidation[]
+}
+
+model ApiLog {
+  id             String   @id @default(cuid())
+  userId         String?
+  apiName        String
+  endpoint       String
+  requestPayload Json?
+  responseStatus Int?
+  tokensUsed     Int?
+  costEstimate   Float?
+  createdAt      DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([apiName, createdAt])
+  @@index([createdAt])
+}
+
+model Report {
+  id             String   @id @default(cuid())
+  reporterId     String
+  reportedUserId String?
+  targetType     String
+  targetId       String
+  reason         String?
+  createdAt      DateTime @default(now())
+
+  reporter     User  @relation("ReportsFiled", fields: [reporterId], references: [id], onDelete: Cascade)
+  reportedUser User? @relation("ReportsReceived", fields: [reportedUserId], references: [id], onDelete: SetNull)
+
+  @@index([reportedUserId, createdAt])
+  @@index([targetType, targetId])
+}
+
+model ExerciseTranslation {
+  id                    String   @id @default(cuid())
+  sourceName            String   @unique
+  translatedName        String
+  translatedDescription String?
+  gifUrl                String?
+  instructionsFr        String?
+  sourceApi             String   @default("exerciseDB")
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 }
 
 model PerformanceValidation {
@@ -258,4 +325,16 @@ model PerformanceValidation {
   validator   User        @relation(fields: [validatorId], references: [id])
 
   @@unique([performanceId, validatorId])
+}
+model Suggestion {
+  id        String   @id @default(cuid())
+  userId    String?
+  text      String
+  category  String   @default("general")
+  status    String   @default("new")  // "new" | "reviewed" | "done"
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
 }

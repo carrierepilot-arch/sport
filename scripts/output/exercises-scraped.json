@@ -1,0 +1,1436 @@
+{
+  "generatedAt": "2026-03-27T23:23:28.639Z",
+  "config": {
+    "maxPagesPerSource": 1,
+    "timeoutMs": 6000,
+    "delayMs": 250,
+    "seedCount": 23,
+    "topic": "abdos"
+  },
+  "summary": {
+    "pagesVisited": 23,
+    "rawItems": 110,
+    "uniqueExercises": 106
+  },
+  "sources": [
+    {
+      "url": "https://html.duckduckgo.com/html/?q=abdos%20exercices",
+      "category": "custom",
+      "pagesVisited": 1,
+      "extractedItems": 0
+    },
+    {
+      "url": "https://html.duckduckgo.com/html/?q=abdos%20exercises",
+      "category": "custom",
+      "pagesVisited": 1,
+      "extractedItems": 0
+    },
+    {
+      "url": "https://www.google.com/search?q=abdos%20exercices",
+      "category": "custom",
+      "pagesVisited": 1,
+      "extractedItems": 0
+    },
+    {
+      "url": "https://www.google.com/search?q=abdos%20exercises",
+      "category": "custom",
+      "pagesVisited": 1,
+      "extractedItems": 0
+    },
+    {
+      "url": "https://www.youtube.com/results?search_query=abdos%20exercices",
+      "category": "custom",
+      "pagesVisited": 1,
+      "extractedItems": 0
+    },
+    {
+      "url": "https://www.thenx.com/exercises",
+      "category": "streetworkout",
+      "pagesVisited": 1,
+      "extractedItems": 0
+    },
+    {
+      "url": "https://www.barbrothersgroningen.com/calisthenics-exercises/",
+      "category": "streetworkout",
+      "pagesVisited": 1,
+      "extractedItems": 0
+    },
+    {
+      "url": "https://www.reddit.com/r/bodyweightfitness/wiki/kb/recommended_routine/",
+      "category": "streetworkout",
+      "pagesVisited": 1,
+      "extractedItems": 5
+    },
+    {
+      "url": "https://www.setforset.com/blogs/news/calisthenics-exercises",
+      "category": "streetworkout",
+      "pagesVisited": 1,
+      "extractedItems": 0
+    },
+    {
+      "url": "https://wodprep.com/blog/calisthenics-exercises/",
+      "category": "streetworkout",
+      "pagesVisited": 1,
+      "extractedItems": 0
+    },
+    {
+      "url": "https://www.bodybuilding.com/exercises",
+      "category": "gym",
+      "pagesVisited": 1,
+      "extractedItems": 0
+    },
+    {
+      "url": "https://www.muscleandstrength.com/exercises",
+      "category": "gym",
+      "pagesVisited": 1,
+      "extractedItems": 6
+    },
+    {
+      "url": "https://www.verywellfit.com/exercise-database-4157602",
+      "category": "gym",
+      "pagesVisited": 1,
+      "extractedItems": 0
+    },
+    {
+      "url": "https://www.menshealth.com/fitness/",
+      "category": "gym",
+      "pagesVisited": 1,
+      "extractedItems": 1
+    },
+    {
+      "url": "https://www.strengthlog.com/exercise-directory/",
+      "category": "gym",
+      "pagesVisited": 1,
+      "extractedItems": 74
+    },
+    {
+      "url": "https://www.healthline.com/health/fitness/home-workout",
+      "category": "home",
+      "pagesVisited": 1,
+      "extractedItems": 0
+    },
+    {
+      "url": "https://www.nerdfitness.com/blog/beginner-body-weight-workout-burn-fat-build-muscle/",
+      "category": "home",
+      "pagesVisited": 1,
+      "extractedItems": 6
+    },
+    {
+      "url": "https://darebee.com/workouts.html",
+      "category": "home",
+      "pagesVisited": 1,
+      "extractedItems": 0
+    },
+    {
+      "url": "https://www.self.com/gallery/bodyweight-exercises-you-can-do-at-home",
+      "category": "home",
+      "pagesVisited": 1,
+      "extractedItems": 18
+    },
+    {
+      "url": "https://www.nike.com/a/bodyweight-exercises",
+      "category": "home",
+      "pagesVisited": 1,
+      "extractedItems": 0
+    },
+    {
+      "url": "https://fr.wikihow.com/faire-du-street-workout",
+      "category": "streetworkout",
+      "pagesVisited": 1,
+      "extractedItems": 0
+    },
+    {
+      "url": "https://www.decathlon.fr/c/disc/musculation_6f8f8d92-9f09-4fb5-a0d6-4e2d68f96f0b",
+      "category": "gym",
+      "pagesVisited": 1,
+      "extractedItems": 0
+    },
+    {
+      "url": "https://www.doctissimo.fr/forme/diaporamas/exercices-a-faire-a-la-maison",
+      "category": "home",
+      "pagesVisited": 1,
+      "extractedItems": 0
+    }
+  ],
+  "exercises": [
+    {
+      "name": "Abdominal Training",
+      "slug": "abdominal-training",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 6
+    },
+    {
+      "name": "Assisted Chin-Up",
+      "slug": "assisted-chin-up",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Assisted Pull-Up",
+      "slug": "assisted-pull-up",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Banded Face Pull",
+      "slug": "banded-face-pull",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 6
+    },
+    {
+      "name": "Barbell Deadlift With Proper Form",
+      "slug": "barbell-deadlift-with-proper-form",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.menshealth.com/fitness/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 4
+    },
+    {
+      "name": "Barbell Rear Delt Row",
+      "slug": "barbell-rear-delt-row",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Barbell Row",
+      "slug": "barbell-row",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Barbell Upright Row",
+      "slug": "barbell-upright-row",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Bear Planks",
+      "slug": "bear-planks",
+      "categories": [
+        "home"
+      ],
+      "sourceUrls": [
+        "https://www.self.com/gallery/bodyweight-exercises-you-can-do-at-home"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 6
+    },
+    {
+      "name": "Bent Over Dumbbell Row",
+      "slug": "bent-over-dumbbell-row",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.muscleandstrength.com/exercises"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 11
+    },
+    {
+      "name": "Bent Over Row",
+      "slug": "bent-over-row",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.muscleandstrength.com/exercises"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 11
+    },
+    {
+      "name": "Bent Over Rows",
+      "slug": "bent-over-rows",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.muscleandstrength.com/exercises"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 8
+    },
+    {
+      "name": "Bicycle Crunch",
+      "slug": "bicycle-crunch",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Bicycle Crunches",
+      "slug": "bicycle-crunches",
+      "categories": [
+        "home"
+      ],
+      "sourceUrls": [
+        "https://www.self.com/gallery/bodyweight-exercises-you-can-do-at-home"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 6
+    },
+    {
+      "name": "Bird Dog Crunches",
+      "slug": "bird-dog-crunches",
+      "categories": [
+        "home"
+      ],
+      "sourceUrls": [
+        "https://www.self.com/gallery/bodyweight-exercises-you-can-do-at-home"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 6
+    },
+    {
+      "name": "Cable Close Grip Seated Row",
+      "slug": "cable-close-grip-seated-row",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 7
+    },
+    {
+      "name": "Cable Crunch",
+      "slug": "cable-crunch",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Cable Rear Delt Row",
+      "slug": "cable-rear-delt-row",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Cable Wide Grip Seated Row",
+      "slug": "cable-wide-grip-seated-row",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 7
+    },
+    {
+      "name": "Captain’s Chair Leg Raise",
+      "slug": "captain-s-chair-leg-raise",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Chest-Supported Dumbbell Row",
+      "slug": "chest-supported-dumbbell-row",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Chin-Up",
+      "slug": "chin-up",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Close-Grip Chin-Up",
+      "slug": "close-grip-chin-up",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Copenhagen Plank",
+      "slug": "copenhagen-plank",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Crunch",
+      "slug": "crunch",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Deadlift",
+      "slug": "deadlift",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Deadlift Variations",
+      "slug": "deadlift-variations",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 6
+    },
+    {
+      "name": "Deficit Deadlift",
+      "slug": "deficit-deadlift",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "DOORWAY ROW",
+      "slug": "doorway-row",
+      "categories": [
+        "home"
+      ],
+      "sourceUrls": [
+        "https://www.nerdfitness.com/blog/beginner-body-weight-workout-burn-fat-build-muscle/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Dumbbell Deadlift",
+      "slug": "dumbbell-deadlift",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.muscleandstrength.com/exercises",
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 2,
+      "qualityScore": 11
+    },
+    {
+      "name": "Dumbbell Rear Delt Row",
+      "slug": "dumbbell-rear-delt-row",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Dumbbell Romanian Deadlift",
+      "slug": "dumbbell-romanian-deadlift",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Dumbbell Row",
+      "slug": "dumbbell-row",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Dumbbell Stiff Leg Deadlift",
+      "slug": "dumbbell-stiff-leg-deadlift",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.muscleandstrength.com/exercises"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 11
+    },
+    {
+      "name": "Dynamic Side Plank",
+      "slug": "dynamic-side-plank",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Face Pull",
+      "slug": "face-pull",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 6
+    },
+    {
+      "name": "Fat Bar Deadlift",
+      "slug": "fat-bar-deadlift",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Forearm Side Plank Twists",
+      "slug": "forearm-side-plank-twists",
+      "categories": [
+        "home"
+      ],
+      "sourceUrls": [
+        "https://www.self.com/gallery/bodyweight-exercises-you-can-do-at-home"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 6
+    },
+    {
+      "name": "Gorilla Row",
+      "slug": "gorilla-row",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Hanging Knee Raise",
+      "slug": "hanging-knee-raise",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 5
+    },
+    {
+      "name": "Hanging Leg Raise",
+      "slug": "hanging-leg-raise",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Hollow Body Crunch",
+      "slug": "hollow-body-crunch",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Integrating Barbell Squats and Deadlifts",
+      "slug": "integrating-barbell-squats-and-deadlifts",
+      "categories": [
+        "streetworkout"
+      ],
+      "sourceUrls": [
+        "https://www.reddit.com/r/bodyweightfitness/wiki/kb/recommended_routine/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 4
+    },
+    {
+      "name": "Inverted Row",
+      "slug": "inverted-row",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Inverted Row with Underhand Grip",
+      "slug": "inverted-row-with-underhand-grip",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 4
+    },
+    {
+      "name": "Kettlebell Plank Pull Through",
+      "slug": "kettlebell-plank-pull-through",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 6
+    },
+    {
+      "name": "Kettlebell Row",
+      "slug": "kettlebell-row",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "KNEE PLANK",
+      "slug": "knee-plank",
+      "categories": [
+        "home"
+      ],
+      "sourceUrls": [
+        "https://www.nerdfitness.com/blog/beginner-body-weight-workout-burn-fat-build-muscle/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Kneeling Plank",
+      "slug": "kneeling-plank",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Kneeling Side Plank",
+      "slug": "kneeling-side-plank",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Kroc Row",
+      "slug": "kroc-row",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Lateral Leg Raises",
+      "slug": "lateral-leg-raises",
+      "categories": [
+        "home"
+      ],
+      "sourceUrls": [
+        "https://www.self.com/gallery/bodyweight-exercises-you-can-do-at-home"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 6
+    },
+    {
+      "name": "Lateral Plank Walks",
+      "slug": "lateral-plank-walks",
+      "categories": [
+        "home"
+      ],
+      "sourceUrls": [
+        "https://www.self.com/gallery/bodyweight-exercises-you-can-do-at-home"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 6
+    },
+    {
+      "name": "Lying Leg Raise",
+      "slug": "lying-leg-raise",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Machine Crunch",
+      "slug": "machine-crunch",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Monkey Row",
+      "slug": "monkey-row",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Mountain Climbers",
+      "slug": "mountain-climbers",
+      "categories": [
+        "gym",
+        "home"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/",
+        "https://www.self.com/gallery/bodyweight-exercises-you-can-do-at-home"
+      ],
+      "sourceCount": 2,
+      "qualityScore": 6
+    },
+    {
+      "name": "Oblique Crunch",
+      "slug": "oblique-crunch",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "One Arm Dumbbell Row",
+      "slug": "one-arm-dumbbell-row",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.muscleandstrength.com/exercises"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 11
+    },
+    {
+      "name": "ONE ARM ROW",
+      "slug": "one-arm-row",
+      "categories": [
+        "home"
+      ],
+      "sourceUrls": [
+        "https://www.nerdfitness.com/blog/beginner-body-weight-workout-burn-fat-build-muscle/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "One-Handed Cable Row",
+      "slug": "one-handed-cable-row",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Pause Deadlift",
+      "slug": "pause-deadlift",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Pendlay Row",
+      "slug": "pendlay-row",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Plank",
+      "slug": "plank",
+      "categories": [
+        "gym",
+        "home"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/",
+        "https://www.nerdfitness.com/blog/beginner-body-weight-workout-burn-fat-build-muscle/"
+      ],
+      "sourceCount": 2,
+      "qualityScore": 9
+    },
+    {
+      "name": "Plank Hops",
+      "slug": "plank-hops",
+      "categories": [
+        "home"
+      ],
+      "sourceUrls": [
+        "https://www.self.com/gallery/bodyweight-exercises-you-can-do-at-home"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 6
+    },
+    {
+      "name": "Plank Jacks",
+      "slug": "plank-jacks",
+      "categories": [
+        "home"
+      ],
+      "sourceUrls": [
+        "https://www.self.com/gallery/bodyweight-exercises-you-can-do-at-home"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 6
+    },
+    {
+      "name": "Plank Taps",
+      "slug": "plank-taps",
+      "categories": [
+        "home"
+      ],
+      "sourceUrls": [
+        "https://www.self.com/gallery/bodyweight-exercises-you-can-do-at-home"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 6
+    },
+    {
+      "name": "Plank to Push-Up",
+      "slug": "plank-to-push-up",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 6
+    },
+    {
+      "name": "Plank Ups",
+      "slug": "plank-ups",
+      "categories": [
+        "home"
+      ],
+      "sourceUrls": [
+        "https://www.self.com/gallery/bodyweight-exercises-you-can-do-at-home"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 6
+    },
+    {
+      "name": "Plank with Leg Lifts",
+      "slug": "plank-with-leg-lifts",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 6
+    },
+    {
+      "name": "Plank with Shoulder Taps",
+      "slug": "plank-with-shoulder-taps",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 6
+    },
+    {
+      "name": "Plank With T Rotations",
+      "slug": "plank-with-t-rotations",
+      "categories": [
+        "home"
+      ],
+      "sourceUrls": [
+        "https://www.self.com/gallery/bodyweight-exercises-you-can-do-at-home"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 6
+    },
+    {
+      "name": "Pull-Up",
+      "slug": "pull-up",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Pull-up progression",
+      "slug": "pull-up-progression",
+      "categories": [
+        "streetworkout"
+      ],
+      "sourceUrls": [
+        "https://www.reddit.com/r/bodyweightfitness/wiki/kb/recommended_routine/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 8
+    },
+    {
+      "name": "Pull-Up With a Neutral Grip",
+      "slug": "pull-up-with-a-neutral-grip",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 4
+    },
+    {
+      "name": "Renegade Row",
+      "slug": "renegade-row",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Ring Pull-Up",
+      "slug": "ring-pull-up",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Ring Row",
+      "slug": "ring-row",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Romanian Deadlift",
+      "slug": "romanian-deadlift",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Row Progression",
+      "slug": "row-progression",
+      "categories": [
+        "streetworkout"
+      ],
+      "sourceUrls": [
+        "https://www.reddit.com/r/bodyweightfitness/wiki/kb/recommended_routine/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 8
+    },
+    {
+      "name": "Rowing Machine",
+      "slug": "rowing-machine",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 6
+    },
+    {
+      "name": "Scap Pull-Up",
+      "slug": "scap-pull-up",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Seal Row",
+      "slug": "seal-row",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Seated Machine Row",
+      "slug": "seated-machine-row",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Second Plank.",
+      "slug": "second-plank",
+      "categories": [
+        "home"
+      ],
+      "sourceUrls": [
+        "https://www.nerdfitness.com/blog/beginner-body-weight-workout-burn-fat-build-muscle/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 6
+    },
+    {
+      "name": "Side Plank",
+      "slug": "side-plank",
+      "categories": [
+        "gym",
+        "home"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/",
+        "https://www.nerdfitness.com/blog/beginner-body-weight-workout-burn-fat-build-muscle/"
+      ],
+      "sourceCount": 2,
+      "qualityScore": 9
+    },
+    {
+      "name": "Side Plank Dips",
+      "slug": "side-plank-dips",
+      "categories": [
+        "home"
+      ],
+      "sourceUrls": [
+        "https://www.self.com/gallery/bodyweight-exercises-you-can-do-at-home"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 6
+    },
+    {
+      "name": "Side Plank Rotation With Kicks",
+      "slug": "side-plank-rotation-with-kicks",
+      "categories": [
+        "home"
+      ],
+      "sourceUrls": [
+        "https://www.self.com/gallery/bodyweight-exercises-you-can-do-at-home"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 4
+    },
+    {
+      "name": "Single Leg Deadlift with Kettlebell",
+      "slug": "single-leg-deadlift-with-kettlebell",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 4
+    },
+    {
+      "name": "Single Leg Romanian Deadlift",
+      "slug": "single-leg-romanian-deadlift",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Smith Machine Deadlift",
+      "slug": "smith-machine-deadlift",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Smith Machine One-Handed Row",
+      "slug": "smith-machine-one-handed-row",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Smith Machine Romanian Deadlift",
+      "slug": "smith-machine-romanian-deadlift",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Snatch Grip Deadlift",
+      "slug": "snatch-grip-deadlift",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Spider-Man Mountain Climbers",
+      "slug": "spider-man-mountain-climbers",
+      "categories": [
+        "home"
+      ],
+      "sourceUrls": [
+        "https://www.self.com/gallery/bodyweight-exercises-you-can-do-at-home"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 6
+    },
+    {
+      "name": "Standing Oblique Crunches",
+      "slug": "standing-oblique-crunches",
+      "categories": [
+        "home"
+      ],
+      "sourceUrls": [
+        "https://www.self.com/gallery/bodyweight-exercises-you-can-do-at-home"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 6
+    },
+    {
+      "name": "Start in a high plank.",
+      "slug": "start-in-a-high-plank",
+      "categories": [
+        "home"
+      ],
+      "sourceUrls": [
+        "https://www.self.com/gallery/bodyweight-exercises-you-can-do-at-home"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 4
+    },
+    {
+      "name": "Start in high plank.",
+      "slug": "start-in-high-plank",
+      "categories": [
+        "home"
+      ],
+      "sourceUrls": [
+        "https://www.self.com/gallery/bodyweight-exercises-you-can-do-at-home"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 6
+    },
+    {
+      "name": "Stiff-Legged Deadlift",
+      "slug": "stiff-legged-deadlift",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Sumo Deadlift",
+      "slug": "sumo-deadlift",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "T-Bar Row",
+      "slug": "t-bar-row",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Towel Pull-Up",
+      "slug": "towel-pull-up",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Towel Row",
+      "slug": "towel-row",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "Weighted Plank",
+      "slug": "weighted-plank",
+      "categories": [
+        "gym"
+      ],
+      "sourceUrls": [
+        "https://www.strengthlog.com/exercise-directory/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 9
+    },
+    {
+      "name": "x5-8 Pull-up progression",
+      "slug": "x5-8-pull-up-progression",
+      "categories": [
+        "streetworkout"
+      ],
+      "sourceUrls": [
+        "https://www.reddit.com/r/bodyweightfitness/wiki/kb/recommended_routine/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 6
+    },
+    {
+      "name": "x5-8 Row Progression",
+      "slug": "x5-8-row-progression",
+      "categories": [
+        "streetworkout"
+      ],
+      "sourceUrls": [
+        "https://www.reddit.com/r/bodyweightfitness/wiki/kb/recommended_routine/"
+      ],
+      "sourceCount": 1,
+      "qualityScore": 6
+    }
+  ]
+}

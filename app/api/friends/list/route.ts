@@ -3,59 +3,82 @@ import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
-  try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-    if (!token) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
+ try {
+ const authHeader = request.headers.get('authorization');
+ const token = authHeader?.replace('Bearer ', '');
+ if (!token) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
 
-    const payload = verifyToken(token);
-    if (!payload) return NextResponse.json({ error: 'Token invalide' }, { status: 401 });
+ const payload = verifyToken(token);
+ if (!payload) return NextResponse.json({ error: 'Token invalide' }, { status: 401 });
 
-    const [accepted, received, sent] = await Promise.all([
-      // Amis acceptés (je suis sender ou receiver)
-      prisma.friendRequest.findMany({
-        where: {
-          status: 'accepted',
-          OR: [{ senderId: payload.userId }, { receiverId: payload.userId }],
-        },
-        include: { sender: true, receiver: true },
-      }),
-      // Demandes reçues en attente
-      prisma.friendRequest.findMany({
-        where: { receiverId: payload.userId, status: 'pending' },
-        include: { sender: true },
-      }),
-      // Demandes envoyées en attente
-      prisma.friendRequest.findMany({
-        where: { senderId: payload.userId, status: 'pending' },
-        include: { receiver: true },
-      }),
-    ]);
+ const [accepted, received, sent] = await Promise.all([
+ // Amis acceptés (je suis sender ou receiver)
+ prisma.friendRequest.findMany({
+ where: {
+ status: { in: ['accepted', 'accepte'] },
+ OR: [{ senderId: payload.userId }, { receiverId: payload.userId }],
+ },
+ select: { id: true, senderId: true, receiverId: true },
+ }),
+ // Demandes reçues en attente
+ prisma.friendRequest.findMany({
+ where: { receiverId: payload.userId, status: { in: ['pending', 'en_attente'] } },
+ select: { id: true, senderId: true },
+ }),
+ // Demandes envoyées en attente
+ prisma.friendRequest.findMany({
+ where: { senderId: payload.userId, status: { in: ['pending', 'en_attente'] } },
+ select: { id: true, receiverId: true },
+ }),
+ ]);
 
-    const amis = accepted.map((r) => {
-      const friend = r.senderId === payload.userId ? r.receiver : r.sender;
-      return { id: r.id, friendId: friend.id, pseudo: friend.pseudo ?? friend.email, nom: friend.name ?? friend.email, statut: 'accepte' as const };
-    });
+ const userIds = Array.from(
+ new Set([
+ ...accepted.map((r) => r.senderId),
+ ...accepted.map((r) => r.receiverId),
+ ...received.map((r) => r.senderId),
+ ...sent.map((r) => r.receiverId),
+ ]),
+ );
+ const users = userIds.length
+ ? await prisma.user.findMany({
+ where: { id: { in: userIds } },
+ select: { id: true, pseudo: true, name: true, email: true },
+ })
+ : [];
+ const userMap = new Map(users.map((u) => [u.id, u]));
 
-    const recus = received.map((r) => ({
-      id: r.id,
-      friendId: r.sender.id,
-      pseudo: r.sender.pseudo ?? r.sender.email,
-      nom: r.sender.name ?? r.sender.email,
-      statut: 'recu' as const,
-    }));
+ const amis = accepted.map((r) => {
+ const friendId = r.senderId === payload.userId ? r.receiverId : r.senderId;
+ const friend = userMap.get(friendId);
+ return {
+ id: r.id,
+ friendId,
+ pseudo: friend?.pseudo ?? friend?.email ?? 'ami',
+ nom: friend?.name ?? friend?.email ?? 'Ami',
+ statut: 'accepte' as const,
+ };
+ });
 
-    const enAttente = sent.map((r) => ({
-      id: r.id,
-      friendId: r.receiver.id,
-      pseudo: r.receiver.pseudo ?? r.receiver.email,
-      nom: r.receiver.name ?? r.receiver.email,
-      statut: 'en_attente' as const,
-    }));
+ const recus = received.map((r) => ({
+ id: r.id,
+ friendId: r.senderId,
+ pseudo: userMap.get(r.senderId)?.pseudo ?? userMap.get(r.senderId)?.email ?? 'ami',
+ nom: userMap.get(r.senderId)?.name ?? userMap.get(r.senderId)?.email ?? 'Ami',
+ statut: 'recu' as const,
+ }));
 
-    return NextResponse.json({ amis, recus, enAttente });
-  } catch (error) {
-    console.error('List friends error:', error);
-    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
-  }
+ const enAttente = sent.map((r) => ({
+ id: r.id,
+ friendId: r.receiverId,
+ pseudo: userMap.get(r.receiverId)?.pseudo ?? userMap.get(r.receiverId)?.email ?? 'ami',
+ nom: userMap.get(r.receiverId)?.name ?? userMap.get(r.receiverId)?.email ?? 'Ami',
+ statut: 'en_attente' as const,
+ }));
+
+ return NextResponse.json({ amis, recus, enAttente });
+ } catch (error) {
+ console.error('List friends error:', error);
+ return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
+ }
 }
