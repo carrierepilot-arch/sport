@@ -1,0 +1,25 @@
+# Dockerfile - Build Android APK without local Java/Android SDK installation
+
+FROM circleci/android:api-34
+
+# Install Node.js
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y nodejs
+
+WORKDIR /workspace
+
+# Copy project
+COPY . .
+
+# Build
+RUN npm ci && \
+    npm run build && \
+    npx cap sync android && \
+    cd android && \
+    ./gradlew assembleRelease && \
+    cd .. && \
+    cp android/app/build/outputs/apk/release/app-release-unsigned.apk ./app-release-unsigned.apk
+
+# Output
+VOLUME ["/output"]
+CMD cp /workspace/app-release-unsigned.apk /output/ && echo "APK built: /output/app-release-unsigned.apk"

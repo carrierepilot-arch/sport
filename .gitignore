@@ -28,6 +28,22 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Android/APK
+/*.keystore
+/keystore-base64.txt
+/android/app/build/
+/android/.gradle/
+/android/local.properties
+
+# Capacitor
+/android/
+/ios/
+
+# Build artifacts
+/dist/
+*.apk
+*.aab
 .pnpm-debug.log*
 
 # env files (can opt-in for committing if needed)

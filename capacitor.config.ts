@@ -1,12 +1,12 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.sport.app',
+  appId: 'com.sport.fitness',
   appName: 'Sport',
-  webDir: '.next/standalone/app',
+  webDir: 'public',  // PWA files served from public/
   server: {
     androidScheme: 'https',
-    url: 'https://sport-alpha-lake.vercel.app',
+    url: 'https://sport-alpha-lake.vercel.app',  // Production URL
   },
   plugins: {
     SplashScreen: {
