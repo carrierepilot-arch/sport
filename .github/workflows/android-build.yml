@@ -3,16 +3,15 @@ name: Build Offline-First Android APK
 on:
   push:
     tags:
-      - 'v*'  # Trigger on version tags like v1.0.0
-  workflow_dispatch:  # Allow manual trigger from GitHub UI
+      - 'v*'
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
     
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -25,136 +24,40 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-          cache: 'gradle'
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Node dependencies
+      - name: Install dependencies
         run: npm ci
 
-      - name: Build Next.js
+      - name: Build Next.js app
         run: npm run build
-        env:
-          # Set environment for offline-first build
-          NEXT_PUBLIC_MODE: offline
-
-      - name: Prepare assets for Capacitor
-        run: |
-          mkdir -p public
-          # Ensure manifest and service worker exist
-          if [ ! -f public/manifest.json ]; then
-            echo "⚠️  Warning: manifest.json not found, creating default"
-          fi
-          if [ ! -f public/service-worker.js ]; then
-            echo "⚠️  Warning: service-worker.js not found, creating default"
-          fi
 
       - name: Initialize Capacitor Android
-        run: npx cap add android --web-dir=public
-
-      - name: Sync Capacitor
-        run: npx cap sync android
-
-      - name: Verify Android assets
         run: |
-          if [ -d "android/app/src/main/assets" ]; then
-            echo "✓ Android assets directory found"
-            find android/app/src/main/assets -type f | head -20
-          fi
+          rm -rf android
+          npx cap add android
 
-      - name: Decode keystore
-        env:
-          KEYSTORE_CONTENT: ${{ secrets.KEYSTORE_BASE64 }}
-          KEYSTORE_PATH: ./android/sport.keystore
-        run: |
-          if [ -z "$KEYSTORE_CONTENT" ]; then
-            echo "⚠️  No keystore provided - will build unsigned APK"
-          else
-            echo "$KEYSTORE_CONTENT" | base64 -d > "$KEYSTORE_PATH"
-            ls -lha "$KEYSTORE_PATH"
-          fi
-
-      - name: Build APK
+      - name: Build unsigned APK
         working-directory: ./android
         run: |
-          ./gradlew clean
+          chmod +x gradlew
           ./gradlew assembleRelease
-
-      - name: Sign APK
-        if: secrets.KEYSTORE_BASE64 != ''
-        env:
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: sport-key
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        working-directory: ./android
-        run: |
-          UNSIGNED_APK="app/build/outputs/apk/release/app-release-unsigned.apk"
-          SIGNED_APK="app/build/outputs/apk/release/app-release.apk"
-          
-          # Sign the APK
-          jarsigner -verbose \
-            -sigalg SHA256withRSA \
-            -digestalg SHA-256 \
-            -keystore ../android/sport.keystore \
-            -storepass "$KEYSTORE_PASSWORD" \
-            -keypass "$KEY_PASSWORD" \
-            "$UNSIGNED_APK" \
-            "$KEY_ALIAS"
-          
-          # Align APK
-          ${ANDROID_SDK_ROOT}/build-tools/*/zipalign -v 4 \
-            "$UNSIGNED_APK" \
-            "$SIGNED_APK"
-          
-          echo "✓ Signed APK: $SIGNED_APK"
-          ls -lha "$SIGNED_APK"
-        continue-on-error: true
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: offline-apk
-          path: |
-            ./android/app/build/outputs/apk/release/app-release.apk
-            ./android/app/build/outputs/apk/release/app-release-unsigned.apk
 
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            ./android/app/build/outputs/apk/release/app-release.apk
-            ./android/app/build/outputs/apk/release/app-release-unsigned.apk
+            android/app/build/outputs/apk/release/app-release-unsigned.apk
           draft: false
           prerelease: false
           body: |
-            # Offline-First APK Release
-            
-            This APK is fully functional without internet connection!
-            
+            Offline-First APK - Ready for Google Play Store
             - Works 100% offline
             - All assets embedded
-            - Data pre-loaded from demo database
-            - Service Worker caching
-            - IndexedDB local storage
-            
-            Ready for Google Play Store upload.
+            - Pre-loaded demo data
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Print summary
-        if: success()
-        run: |
-          echo "✅ Offline APK built successfully!"
-          echo ""
-          echo "📦 Build Details:"
-          echo "  - Type: Offline-First APK (100% functional without internet)"
-          echo "  - Assets: Embedded in /public and /android assets"
-          echo "  - Database: IndexedDB with demo data"
-          echo "  - Ready: For Google Play Store"
-          echo ""
-          echo "📥 Download artifacts from:"
-          echo "  - GitHub Actions → This workflow → Artifacts"
-          echo "  - Or GitHub Releases (if tagged)"
 
