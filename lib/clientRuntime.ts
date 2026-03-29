@@ -356,6 +356,31 @@ function buildOfflineApiResponse(pathname: string, init?: RequestInit): Response
     return toJsonResponse({ success: true });
   }
 
+  if (pathname === '/api/feed' && method === 'POST') {
+    const content = typeof body?.content === 'string' ? body.content : '';
+    const author = session?.user ?? normalizeUser(null);
+    const offlinePost = {
+      id: `offline-post-${Date.now()}`,
+      content,
+      createdAt: new Date().toISOString(),
+      author: {
+        id: author.id,
+        pseudo: author.pseudo ?? author.name ?? 'moi',
+      },
+      likeCount: 0,
+      likedByMe: false,
+      replyCount: 0,
+      replies: [],
+    };
+    enqueueMutation({
+      url: pathname,
+      method,
+      headers: init?.headers instanceof Headers ? Object.fromEntries(init.headers.entries()) : (init?.headers as Record<string, string> | undefined) ?? {},
+      body: init?.body as string | undefined,
+    });
+    return toJsonResponse({ success: true, queued: true, post: offlinePost });
+  }
+
   if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
     enqueueMutation({
       url: pathname,

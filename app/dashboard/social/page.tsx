@@ -88,6 +88,7 @@ export default function SocialPage() {
   const [meId, setMeId] = useState('');
   const [composer, setComposer] = useState('');
   const [posting, setPosting] = useState(false);
+  const [composerError, setComposerError] = useState('');
   const [feedLoading, setFeedLoading] = useState(false);
   const [composerImageUrl, setComposerImageUrl] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -203,6 +204,7 @@ export default function SocialPage() {
 
   const publishPost = async () => {
     if ((!composer.trim() && !composerImageUrl) || posting) return;
+    setComposerError('');
     setPosting(true);
     try {
       const postContent = composerImageUrl
@@ -214,13 +216,16 @@ export default function SocialPage() {
         body: JSON.stringify({ content: postContent }),
       });
       const data = await res.json().catch(() => ({}));
-      if (res.ok) {
+      if (res.ok && data?.post && typeof data.post === 'object' && typeof (data.post as FeedPost).id === 'string') {
         setPosts((prev) => [data.post as FeedPost, ...prev]);
         setComposer('');
         setComposerImageUrl(null);
+      } else if (res.ok) {
+        setComposerError('Publication en attente de synchronisation.');
+        await loadFeed();
       }
     } catch {
-      // silent
+      setComposerError('Erreur reseau. Publication en attente de synchronisation.');
     }
     setPosting(false);
   };
@@ -556,6 +561,11 @@ export default function SocialPage() {
                       <button onClick={() => setComposerImageUrl(null)} className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center shadow">✕</button>
                     </div>
                   )}
+                  {composerError && (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
+                      {composerError}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -578,7 +588,7 @@ export default function SocialPage() {
                 )}
 
                 {!feedLoading &&
-                  posts.map((post) => {
+                  posts.filter((post) => post && typeof post.id === 'string').map((post) => {
                     const canDelete = meId && post.author.id === meId;
                     return (
                       <article key={post.id} className="rounded-2xl border border-gray-200 bg-white overflow-hidden shadow-sm hover:shadow-md transition-shadow">
