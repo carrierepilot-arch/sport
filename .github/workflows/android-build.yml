@@ -33,98 +33,92 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Prepare APK build - patch login for offline mode
+      - name: Prepare APK build - patch login for offline
         run: |
           rm -rf app/api
           
-          cat > app/login/page.tsx << 'LoginCode'
-          'use client';
-          import { useState } from 'react';
-          import Link from 'next/link';
-          import { useRouter } from 'next/navigation';
+          cat > app/login/page.tsx << 'EOF'
+          "use client";
+          import { useState } from "react";
+          import { useRouter } from "next/navigation";
           
           export default function LoginPage() {
-            const [email, setEmail] = useState('');
+            const [email, setEmail] = useState("");
             const [loading, setLoading] = useState(false);
             const router = useRouter();
             
-            const handleSubmit = async (e: React.FormEvent) => {
+            const handleSubmit = async (e) => {
               e.preventDefault();
               setLoading(true);
               setTimeout(() => {
-                localStorage.setItem('token', 'offline-token-' + Date.now());
-                localStorage.setItem('user', JSON.stringify({
+                localStorage.setItem("token", "offline-" + Date.now());
+                localStorage.setItem("user", JSON.stringify({
                   id: 1,
-                  email: email || 'demo@sport.local',
-                  name: 'Demo User',
+                  email: email || "demo@sport.local",
+                  name: "Demo User",
                 }));
-                router.push('/dashboard');
+                router.push("/dashboard");
               }, 300);
             };
             
             return (
-              <div className="min-h-screen flex items-center justify-center px-4 py-8 ios-screen">
+              <div className="min-h-screen flex items-center justify-center px-4 py-8">
                 <div className="w-full max-w-md">
-                  <div className="ios-card p-6 sm:p-8">
-                    <div className="text-center mb-8">
-                      <h1 className="text-3xl font-black tracking-tight text-gray-900 mb-2">SPORT</h1>
-                      <p className="text-gray-500">Entrainez-vous partout - Compte demo (offline)</p>
-                    </div>
+                  <div className="p-6 sm:p-8 bg-white rounded-lg shadow">
+                    <h1 className="text-3xl font-bold text-center mb-2">SPORT</h1>
+                    <p className="text-gray-500 text-center mb-8">Entrainement hors ligne</p>
                     <form onSubmit={handleSubmit} className="space-y-6">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Email (optionnel)</label>
-                        <input
-                          type="email"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-sky-500"
-                          placeholder="utilisateur@email.com"
-                        />
-                      </div>
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="Email (optionnel)"
+                        className="w-full px-4 py-3 border rounded-lg"
+                      />
                       <button
                         type="submit"
                         disabled={loading}
-                        className="w-full bg-sky-500 text-white font-semibold py-3 px-4 rounded-2xl hover:bg-sky-600 disabled:bg-gray-400"
+                        className="w-full bg-sky-500 text-white font-semibold py-3 rounded-lg hover:bg-sky-600 disabled:bg-gray-400"
                       >
-                        {loading ? 'Connexion...' : 'Commencer l''entrainement'}
+                        {loading ? "Chargement..." : "Commencer"}
                       </button>
                     </form>
-                    <p className="text-xs text-gray-400 text-center mt-4">Mode offline - Donnees stockees localement</p>
+                    <p className="text-xs text-gray-400 text-center mt-4">Fonctionne 100% hors ligne</p>
                   </div>
                 </div>
               </div>
             );
           }
-          LoginCode
+          EOF
           
-          echo "✓ Login page patched for offline mode"
+          echo "Login page created"
 
-      - name: Build Next.js static export for APK
+      - name: Build Next.js static export
         run: npx prisma generate && npx next build
         env:
           BUILD_TARGET: apk
           DATABASE_URL: "file:./dev.db"
           NEXT_TELEMETRY_DISABLED: "1"
 
-      - name: Initialize Capacitor Android
+      - name: Initialize Capacitor
         run: |
           rm -rf android
           npx cap add android
 
-      - name: Build unsigned APK
+      - name: Build APK
         working-directory: ./android
         run: |
           chmod +x gradlew
           ./gradlew assembleRelease --no-daemon
 
-      - name: Sign APK with apksigner (v2)
+      - name: Sign APK
         run: |
           keytool -genkey -v -keystore sport.keystore \
             -keyalg RSA -keysize 2048 -validity 10000 \
             -alias sport-key \
-            -storepass "SportKey2026!" \
-            -keypass "SportKey2026!" \
-            -dname "CN=Sport Fitness,O=Sport,C=FR" \
+            -storepass "SportKey2026" \
+            -keypass "SportKey2026" \
+            -dname "CN=Sport,O=Sport,C=FR" \
             -noprompt
 
           BUILD_TOOLS=$(ls ${ANDROID_SDK_ROOT}/build-tools/ | sort -V | tail -1)
@@ -136,24 +130,8 @@ jobs:
           SIGNED="android/app/build/outputs/apk/release/sport.apk"
 
           $ZIPALIGN -v -p 4 "$UNSIGNED" "$ALIGNED"
-
-          $APKSIGNER sign \
-            --ks sport.keystore \
-            --ks-pass pass:"SportKey2026!" \
-            --key-pass pass:"SportKey2026!" \
-            --ks-key-alias sport-key \
-            --out "$SIGNED" \
-            "$ALIGNED"
-
+          $APKSIGNER sign --ks sport.keystore --ks-pass pass:SportKey2026 --key-pass pass:SportKey2026 --ks-key-alias sport-key --out "$SIGNED" "$ALIGNED"
           $APKSIGNER verify --verbose "$SIGNED"
-          du -h "$SIGNED"
-
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: sport-apk
-          path: android/app/build/outputs/apk/release/sport.apk
-          retention-days: 30
 
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/v')
@@ -162,17 +140,6 @@ jobs:
           files: android/app/build/outputs/apk/release/sport.apk
           draft: false
           prerelease: false
-          body: |
-            ## APK Sport - Offline Complete
-
-            Telechargez sport.apk - Fonctionne 100% sans internet
-          
-            **Installation:**
-            1. Telechargez sport.apk
-            2. Ouvrez-le sur votre telephone (Gestionnaire fichiers)
-            3. Autorisez sources inconnues si demande
-            4. Utilisez le compte demo - aucun login requis
-          
-            Toutes vos donnees sont stockees localement.
+          body: "APK Sport 100% offline - Pret pour Google Play"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
