@@ -414,7 +414,18 @@ function resolveApiPath(input: RequestInfo | URL): string | null {
 function getApiBaseUrl() {
   const runtimeValue = (window as typeof window & { __SPORT_API_BASE_URL__?: string }).__SPORT_API_BASE_URL__;
   const envValue = process.env.NEXT_PUBLIC_API_BASE_URL;
-  return runtimeValue || envValue || '';
+  if (runtimeValue) return runtimeValue;
+  if (envValue) return envValue;
+
+  const isCapacitorRuntime = typeof (window as typeof window & { Capacitor?: unknown }).Capacitor !== 'undefined';
+  const isAppWebViewOrigin = ['capacitor:', 'file:'].includes(window.location.protocol);
+
+  if (isCapacitorRuntime || isAppWebViewOrigin) {
+    // Stable project-domain alias for production API.
+    return 'https://sport-carrierepilot-8919s-projects.vercel.app';
+  }
+
+  return '';
 }
 
 function resolveApiRequestInput(input: RequestInfo | URL): RequestInfo | URL {

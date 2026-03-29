@@ -45,6 +45,7 @@ jobs:
           BUILD_TARGET: apk
           DATABASE_URL: "file:./dev.db"
           NEXT_TELEMETRY_DISABLED: "1"
+          NEXT_PUBLIC_API_BASE_URL: "https://sport-carrierepilot-8919s-projects.vercel.app"
 
       - name: Initialize Capacitor
         run: |
