@@ -50,6 +50,9 @@ jobs:
             echo "⚠️  Warning: service-worker.js not found, creating default"
           fi
 
+      - name: Initialize Capacitor Android
+        run: npx cap add android --web-dir=public
+
       - name: Sync Capacitor
         run: npx cap sync android
 
