@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { createAndPersistOfflineSession, getStoredSession, persistSession } from '@/lib/clientRuntime';
 
 export default function RegisterPage() {
  const router = useRouter();
@@ -11,6 +12,13 @@ export default function RegisterPage() {
  const [password, setPassword] = useState('');
  const [error, setError] = useState('');
  const [loading, setLoading] = useState(false);
+
+ useEffect(() => {
+ const session = getStoredSession();
+ if (session?.token) {
+ router.replace('/dashboard');
+ }
+ }, [router]);
 
  const handleSubmit = async (e: React.FormEvent) => {
  e.preventDefault();
@@ -26,15 +34,24 @@ export default function RegisterPage() {
  headers: { 'Content-Type': 'application/json' },
  body: JSON.stringify({ email, password, name }),
  });
- const data = await response.json();
+ const data = await response.json().catch(() => null);
  if (!response.ok) {
- setError(data.error || 'Erreur lors de la creation du compte');
+ const offlineSession = await createAndPersistOfflineSession({ email, name });
+ if (offlineSession.token) {
+ router.push('/dashboard');
  return;
  }
- localStorage.setItem('token', data.token);
- localStorage.setItem('user', JSON.stringify(data.user));
+ setError(data?.error || 'Erreur lors de la creation du compte');
+ return;
+ }
+ await persistSession(data.token, data.user);
  router.push('/dashboard');
  } catch {
+ const offlineSession = await createAndPersistOfflineSession({ email, name });
+ if (offlineSession.token) {
+ router.push('/dashboard');
+ return;
+ }
  setError('Une erreur est survenue');
  } finally {
  setLoading(false);

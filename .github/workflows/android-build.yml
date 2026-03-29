@@ -33,65 +33,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Prepare APK build - patch login for offline
+      - name: Prepare static APK export
         run: |
-          rm -rf app/api
-          
-          cat > app/login/page.tsx << 'EOF'
-          "use client";
-          import { useState } from "react";
-          import { useRouter } from "next/navigation";
-          
-          export default function LoginPage() {
-            const [email, setEmail] = useState("");
-            const [loading, setLoading] = useState(false);
-            const router = useRouter();
-            
-            const handleSubmit = async (e) => {
-              e.preventDefault();
-              setLoading(true);
-              setTimeout(() => {
-                localStorage.setItem("token", "offline-" + Date.now());
-                localStorage.setItem("user", JSON.stringify({
-                  id: 1,
-                  email: email || "demo@sport.local",
-                  name: "Demo User",
-                }));
-                router.push("/dashboard");
-              }, 300);
-            };
-            
-            return (
-              <div className="min-h-screen flex items-center justify-center px-4 py-8">
-                <div className="w-full max-w-md">
-                  <div className="p-6 sm:p-8 bg-white rounded-lg shadow">
-                    <h1 className="text-3xl font-bold text-center mb-2">SPORT</h1>
-                    <p className="text-gray-500 text-center mb-8">Entrainement hors ligne</p>
-                    <form onSubmit={handleSubmit} className="space-y-6">
-                      <input
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="Email (optionnel)"
-                        className="w-full px-4 py-3 border rounded-lg"
-                      />
-                      <button
-                        type="submit"
-                        disabled={loading}
-                        className="w-full bg-sky-500 text-white font-semibold py-3 rounded-lg hover:bg-sky-600 disabled:bg-gray-400"
-                      >
-                        {loading ? "Chargement..." : "Commencer"}
-                      </button>
-                    </form>
-                    <p className="text-xs text-gray-400 text-center mt-4">Fonctionne 100% hors ligne</p>
-                  </div>
-                </div>
-              </div>
-            );
-          }
-          EOF
-          
-          echo "Login page created"
+          if [ -d app/api ]; then
+            mv app/api app_api_ci_backup
+          fi
 
       - name: Build Next.js static export
         run: npx prisma generate && npx next build
@@ -104,6 +50,7 @@ jobs:
         run: |
           rm -rf android
           npx cap add android
+          npx cap sync android
 
       - name: Build APK
         working-directory: ./android

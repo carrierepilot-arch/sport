@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState, useCallback } from 'react';
+import { getStoredSession, updateStoredUser } from '@/lib/clientRuntime';
 
 const musclePlans = [
  { href: '/dashboard/entrainement', title: 'Corps complet', subtitle: 'Sans equipement · 12 min', image: '/images/full-body-card.svg' },
@@ -29,7 +30,13 @@ export default function DashboardPage() {
  const [userName, setUserName] = useState('');
 
  const loadUserInfo = useCallback(async () => {
- const token = localStorage.getItem('token');
+ const session = getStoredSession();
+ const token = session?.token ?? null;
+ if (session?.user) {
+ if (session.user.level) setUserLevel(session.user.level as LevelValue);
+ if (session.user.xp != null) setUserXp(session.user.xp);
+ if (session.user.name) setUserName(session.user.name);
+ }
  if (!token) return;
  try {
  const res = await fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } });
@@ -38,6 +45,7 @@ export default function DashboardPage() {
  if (data.user?.level) setUserLevel(data.user.level as LevelValue);
  if (data.user?.xp != null) setUserXp(data.user.xp);
  if (data.user?.name) setUserName(data.user.name);
+ updateStoredUser(data.user ?? {});
  } catch { /* silencieux */ }
  }, []);
 
@@ -54,7 +62,7 @@ export default function DashboardPage() {
 
  const finishOnboarding = async () => {
  setSaving(true);
- const token = localStorage.getItem('token');
+ const token = getStoredSession()?.token ?? null;
  try {
  if (token) {
  await Promise.all([
@@ -69,8 +77,10 @@ export default function DashboardPage() {
  body: JSON.stringify({ equipmentData: { goal, frequence: days } }),
  }),
  ]);
+ updateStoredUser({ level, equipmentData: { goal, frequence: days } });
  }
  } catch {
+ updateStoredUser({ level, equipmentData: { goal, frequence: days } });
  // Silent fallback: onboarding still closes locally.
  }
  try {

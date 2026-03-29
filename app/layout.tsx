@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import OfflineRuntime from "./components/OfflineRuntime";
 import PWARegister from "./components/PWARegister";
 
 const geistSans = Geist({
@@ -47,6 +48,7 @@ export default function RootLayout({
  className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
  >
  <body className="min-h-full flex flex-col ios-screen">
+ <OfflineRuntime />
  <PWARegister />
  {children}
  </body>

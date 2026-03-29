@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { createAndPersistOfflineSession, getStoredSession, persistSession } from '@/lib/clientRuntime';
 
 export default function LoginPage() {
  const [email, setEmail] = useState('');
@@ -11,6 +12,13 @@ export default function LoginPage() {
  const [loading, setLoading] = useState(false);
 
  const router = useRouter();
+
+ useEffect(() => {
+ const session = getStoredSession();
+ if (session?.token) {
+ router.replace('/dashboard');
+ }
+ }, [router]);
 
  const handleSubmit = async (e: React.FormEvent) => {
  e.preventDefault();
@@ -24,17 +32,31 @@ export default function LoginPage() {
  body: JSON.stringify({ email, password }),
  });
 
- const data = await response.json();
+ const data = await response.json().catch(() => null);
 
  if (!response.ok) {
- setError(data.error || 'Erreur de connexion');
+ const offlineSession = await createAndPersistOfflineSession({ email });
+ if (offlineSession.token) {
+ router.push('/dashboard');
+ return;
+ }
+ setError(data?.error || 'Erreur de connexion');
  return;
  }
 
- localStorage.setItem('token', data.token);
- localStorage.setItem('user', JSON.stringify(data.user));
+ await persistSession(data.token, data.user);
  router.push('/dashboard');
- } catch (err) {
+ } catch {
+ const session = getStoredSession();
+ if (session?.token) {
+ router.push('/dashboard');
+ return;
+ }
+ const offlineSession = await createAndPersistOfflineSession({ email });
+ if (offlineSession.token) {
+ router.push('/dashboard');
+ return;
+ }
  setError('Une erreur est survenue');
  } finally {
  setLoading(false);

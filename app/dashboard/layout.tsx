@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { clearStoredSession, getStoredSession } from '@/lib/clientRuntime';
 
 const PRIMARY_NAV_ITEMS = [
  { href: '/dashboard', label: 'Accueil', icon: 'M3 10.75L12 3l9 7.75M5.25 9.5V20a1 1 0 001 1h4.5v-6.5h2.5V21h4.5a1 1 0 001-1V9.5' },
@@ -69,7 +70,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
  // Client-side auth guard for all dashboard routes.
  useEffect(() => {
   const t = setTimeout(() => {
-   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+     const token = getStoredSession()?.token ?? null;
    if (!token) {
     setIsAuthenticated(false);
     setAuthChecked(true);
@@ -83,7 +84,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
  }, [router]);
 
  useEffect(() => {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  const token = getStoredSession()?.token ?? null;
   if (!token) return;
 
   fetch('/api/sections/status', {
@@ -121,7 +122,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
  // Polling du compte de demandes d'amis en attente + messages non lus
  const fetchPending = useCallback(async () => {
- const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+ const token = getStoredSession()?.token ?? null;
  if (!token) return;
  try {
  const [friendRes, msgRes, inboxRes] = await Promise.all([
@@ -161,11 +162,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
  const handleLogout = () => {
  // Clear local auth state then redirect to login.
- if (typeof window !== 'undefined') {
- localStorage.removeItem('token');
- localStorage.removeItem('user');
- sessionStorage.clear();
- }
+ clearStoredSession();
+ if (typeof window !== 'undefined') sessionStorage.clear();
  router.push('/login');
  };
 
