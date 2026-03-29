@@ -4,14 +4,7 @@ const config: CapacitorConfig = {
   appId: 'com.sport.fitness',
   appName: 'Sport',
   webDir: 'public',
-  // Configure server for local development
-  server: {
-    androidScheme: 'https',
-    // Point to local Next.js server running on device
-    // This allows full offline capability with API routes
-    url: 'http://localhost:3000',
-    cleartext: true,
-  },
+  // 100% offline-first: No server URL, all assets embedded
   plugins: {
     SplashScreen: {
       launchShowDuration: 0,
