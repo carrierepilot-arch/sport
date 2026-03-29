@@ -436,6 +436,18 @@ function resolveApiPath(input: RequestInfo | URL): string | null {
   }
 }
 
+function resolveApiPathWithSearch(input: RequestInfo | URL): string | null {
+  const raw = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+  try {
+    const url = raw.startsWith('http') ? new URL(raw) : new URL(raw, window.location.origin);
+    if (!url.pathname.startsWith('/api/')) return null;
+    return `${url.pathname}${url.search}`;
+  } catch {
+    if (!raw.startsWith('/api/')) return null;
+    return raw;
+  }
+}
+
 function getApiBaseUrl() {
   const runtimeValue = (window as typeof window & { __SPORT_API_BASE_URL__?: string }).__SPORT_API_BASE_URL__;
   const envValue = process.env.NEXT_PUBLIC_API_BASE_URL;
@@ -455,11 +467,11 @@ function getApiBaseUrl() {
 
 function resolveApiRequestInput(input: RequestInfo | URL): RequestInfo | URL {
   if (!isBrowser()) return input;
-  const pathname = resolveApiPath(input);
-  if (!pathname) return input;
+  const apiPathWithSearch = resolveApiPathWithSearch(input);
+  if (!apiPathWithSearch) return input;
   const baseUrl = getApiBaseUrl().trim();
-  if (!baseUrl) return pathname;
-  return `${baseUrl.replace(/\/$/, '')}${pathname}`;
+  if (!baseUrl) return apiPathWithSearch;
+  return `${baseUrl.replace(/\/$/, '')}${apiPathWithSearch}`;
 }
 
 export async function flushQueuedMutations() {

@@ -29,6 +29,7 @@ export default function RegisterPage() {
  }
  setLoading(true);
  try {
+ const canUseOfflineMode = typeof window !== 'undefined' && !window.navigator.onLine;
  const response = await fetch('/api/auth/register', {
  method: 'POST',
  headers: { 'Content-Type': 'application/json' },
@@ -36,10 +37,12 @@ export default function RegisterPage() {
  });
  const data = await response.json().catch(() => null);
  if (!response.ok) {
+ if (canUseOfflineMode) {
  const offlineSession = await createAndPersistOfflineSession({ email, name });
  if (offlineSession.token) {
  router.push('/dashboard');
  return;
+ }
  }
  setError(data?.error || 'Erreur lors de la creation du compte');
  return;
@@ -47,12 +50,17 @@ export default function RegisterPage() {
  await persistSession(data.token, data.user);
  router.push('/dashboard');
  } catch {
+ const canUseOfflineMode = typeof window !== 'undefined' && !window.navigator.onLine;
+ if (canUseOfflineMode) {
  const offlineSession = await createAndPersistOfflineSession({ email, name });
  if (offlineSession.token) {
  router.push('/dashboard');
  return;
  }
- setError('Une erreur est survenue');
+ setError('Mode hors ligne indisponible.');
+ } else {
+ setError('Impossible de joindre le serveur.');
+ }
  } finally {
  setLoading(false);
  }

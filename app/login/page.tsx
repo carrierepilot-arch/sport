@@ -26,6 +26,7 @@ export default function LoginPage() {
  setLoading(true);
 
  try {
+ const canUseOfflineMode = typeof window !== 'undefined' && !window.navigator.onLine;
  const response = await fetch('/api/auth/login', {
  method: 'POST',
  headers: { 'Content-Type': 'application/json' },
@@ -35,10 +36,12 @@ export default function LoginPage() {
  const data = await response.json().catch(() => null);
 
  if (!response.ok) {
+ if (canUseOfflineMode) {
  const offlineSession = await createAndPersistOfflineSession({ email });
  if (offlineSession.token) {
  router.push('/dashboard');
  return;
+ }
  }
  setError(data?.error || 'Erreur de connexion');
  return;
@@ -47,17 +50,22 @@ export default function LoginPage() {
  await persistSession(data.token, data.user);
  router.push('/dashboard');
  } catch {
+ const canUseOfflineMode = typeof window !== 'undefined' && !window.navigator.onLine;
  const session = getStoredSession();
  if (session?.token) {
  router.push('/dashboard');
  return;
  }
+ if (canUseOfflineMode) {
  const offlineSession = await createAndPersistOfflineSession({ email });
  if (offlineSession.token) {
  router.push('/dashboard');
  return;
  }
- setError('Une erreur est survenue');
+ setError('Mode hors ligne indisponible.');
+ } else {
+ setError('Impossible de joindre le serveur.');
+ }
  } finally {
  setLoading(false);
  }

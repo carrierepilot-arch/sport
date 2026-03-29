@@ -202,6 +202,14 @@ export default function SocialPage() {
     void loadAmis();
   }, [loadFeed, loadConversations, loadAmis]);
 
+  useEffect(() => {
+    if (activeTab !== 'feed') return;
+    const interval = setInterval(() => {
+      void loadFeed();
+    }, 8000);
+    return () => clearInterval(interval);
+  }, [activeTab, loadFeed]);
+
   const publishPost = async () => {
     if ((!composer.trim() && !composerImageUrl) || posting) return;
     setComposerError('');
@@ -220,6 +228,7 @@ export default function SocialPage() {
         setPosts((prev) => [data.post as FeedPost, ...prev]);
         setComposer('');
         setComposerImageUrl(null);
+        await loadFeed();
       } else if (res.ok) {
         setComposerError('Publication en attente de synchronisation.');
         await loadFeed();
