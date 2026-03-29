@@ -1,12 +1,18 @@
 import type { NextConfig } from "next";
 import path from "path";
 
+const isAPKBuild = process.env.BUILD_TARGET === 'apk';
+
 const nextConfig: NextConfig = {
-  turbopack: {
-    root: path.resolve(__dirname),
-  },
-  // Keep server mode for API routes
-  // Capacitor will embed assets and run Next server locally in Android
+  ...(isAPKBuild ? {
+    output: 'export',
+    trailingSlash: true,
+    images: { unoptimized: true },
+  } : {
+    turbopack: {
+      root: path.resolve(__dirname),
+    },
+  }),
 };
 
 export default nextConfig;

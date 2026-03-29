@@ -3,8 +3,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 const config: CapacitorConfig = {
   appId: 'com.sport.fitness',
   appName: 'Sport',
-  webDir: 'public',
-  // 100% offline-first: No server URL, all assets embedded
+  webDir: 'out',
   plugins: {
     SplashScreen: {
       launchShowDuration: 0,
