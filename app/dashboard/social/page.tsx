@@ -232,6 +232,8 @@ export default function SocialPage() {
       } else if (res.ok) {
         setComposerError('Publication en attente de synchronisation.');
         await loadFeed();
+      } else {
+        setComposerError(typeof data?.error === 'string' ? data.error : 'Publication refusee par le serveur.');
       }
     } catch {
       setComposerError('Erreur reseau. Publication en attente de synchronisation.');

@@ -77,6 +77,37 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     router.replace('/login');
     return;
    }
+
+   if (typeof window !== 'undefined' && window.navigator.onLine && token.startsWith('offline-')) {
+    clearStoredSession();
+    setIsAuthenticated(false);
+    setAuthChecked(true);
+    router.replace('/login');
+    return;
+   }
+
+   if (typeof window !== 'undefined' && window.navigator.onLine) {
+    fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } })
+     .then((r) => {
+      if (!r.ok) throw new Error('invalid');
+      return r.json();
+     })
+     .then((data) => {
+      if (data?.user) {
+       localStorage.setItem('user', JSON.stringify(data.user));
+      }
+      setIsAuthenticated(true);
+      setAuthChecked(true);
+     })
+     .catch(() => {
+      clearStoredSession();
+      setIsAuthenticated(false);
+      setAuthChecked(true);
+      router.replace('/login');
+     });
+    return;
+   }
+
    setIsAuthenticated(true);
    setAuthChecked(true);
   }, 0);

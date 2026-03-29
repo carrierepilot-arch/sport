@@ -15,6 +15,15 @@ export default function LoginPage() {
 
  useEffect(() => {
  const session = getStoredSession();
+ const hasOfflineTokenWhileOnline =
+ typeof window !== 'undefined' &&
+ window.navigator.onLine &&
+ Boolean(session?.token?.startsWith('offline-'));
+
+ if (hasOfflineTokenWhileOnline) {
+ return;
+ }
+
  if (session?.token) {
  router.replace('/dashboard');
  }
