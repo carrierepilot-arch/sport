@@ -33,6 +33,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Patch API routes for static export
+        run: |
+          find app/api -name "route.ts" -o -name "route.js" | while read f; do
+            if ! grep -q 'export const dynamic' "$f"; then
+              sed -i '1s/^/export const dynamic = "force-static"\n/' "$f"
+            fi
+          done
+          echo "Patched $(find app/api -name 'route.*' | wc -l) API routes"
+
       - name: Build Next.js static export for APK
         run: npx prisma generate && npx next build
         env:
