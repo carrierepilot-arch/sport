@@ -74,3 +74,6 @@ check-admin.sql
 
 .vercel
 .env*.local
+
+.vercel
+.env*.local

@@ -1,75 +1,99 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { logAdminAction, requireAdminPermission } from '@/lib/admin-auth';
+import { decryptMessageContent } from '@/lib/message-crypto';
 
 export async function GET(request: NextRequest) {
  const admin = await requireAdminPermission(request, 'conversations:read');
  if (!admin) return NextResponse.json({ error: 'Accès refusé' }, { status: 403 });
 
- const [dmMessages, groups] = await Promise.all([
- prisma.message.findMany({
+ const reports = await prisma.report.findMany({
+ where: { targetType: 'message' },
+ orderBy: { createdAt: 'desc' },
+ include: {
+ reporter: { select: { id: true, pseudo: true, name: true, email: true } },
+ reportedUser: { select: { id: true, pseudo: true, name: true, email: true } },
+ },
+ take: 500,
+ });
+
+ const targetIds = Array.from(new Set(reports.map((report) => report.targetId)));
+ const [directMessages, groupMessages] = await Promise.all([
+ targetIds.length
+ ? prisma.message.findMany({
  select: {
+ id: true,
  senderId: true,
  receiverId: true,
+ content: true,
  createdAt: true,
  sender: { select: { pseudo: true, name: true, email: true } },
  receiver: { select: { pseudo: true, name: true, email: true } },
  },
- orderBy: { createdAt: 'desc' },
- take: 3000,
- }),
- prisma.group.findMany({
- include: {
- owner: { select: { pseudo: true, name: true, email: true } },
- _count: { select: { messages: true, members: true } },
+ where: { id: { in: targetIds } },
+ })
+ : Promise.resolve([]),
+ targetIds.length
+ ? prisma.groupMessage.findMany({
+ select: {
+ id: true,
+ userId: true,
+ groupId: true,
+ content: true,
+ createdAt: true,
+ user: { select: { pseudo: true, name: true, email: true } },
+ group: { select: { id: true, name: true } },
  },
- orderBy: { createdAt: 'desc' },
- take: 200,
- }),
+ where: { id: { in: targetIds } },
+ })
+ : Promise.resolve([]),
  ]);
 
- const dmMap = new Map<string, {
- key: string;
- userAId: string;
- userBId: string;
- userA: string;
- userB: string;
- count: number;
- lastAt: string;
- }>();
+ const directById = new Map(directMessages.map((message) => [message.id, message]));
+ const groupById = new Map(groupMessages.map((message) => [message.id, message]));
+ const groupedReports = reports.reduce((acc, report) => {
+ const bucket = acc.get(report.targetId) ?? [];
+ bucket.push(report);
+ acc.set(report.targetId, bucket);
+ return acc;
+ }, new Map<string, typeof reports>());
 
- for (const msg of dmMessages) {
- const ids = [msg.senderId, msg.receiverId].sort();
- const key = `${ids[0]}:${ids[1]}`;
- const entry = dmMap.get(key);
- if (entry) {
- entry.count += 1;
- if (new Date(msg.createdAt) > new Date(entry.lastAt)) entry.lastAt = msg.createdAt.toISOString();
- continue;
- }
+ const directConversations = Array.from(groupedReports.entries())
+ .map(([targetId, items]) => {
+ const message = directById.get(targetId);
+ if (!message) return null;
+ return {
+ key: targetId,
+ messageId: targetId,
+ sender: message.sender.pseudo || message.sender.name || message.sender.email,
+ recipient: message.receiver.pseudo || message.receiver.name || message.receiver.email,
+ preview: decryptMessageContent(message.content),
+ reason: items[0]?.reason ?? null,
+ reportCount: items.length,
+ lastAt: message.createdAt.toISOString(),
+ };
+ })
+ .filter((item): item is NonNullable<typeof item> => !!item)
+ .sort((a, b) => new Date(b.lastAt).getTime() - new Date(a.lastAt).getTime());
 
- const senderName = msg.sender.pseudo || msg.sender.name || msg.sender.email;
- const receiverName = msg.receiver.pseudo || msg.receiver.name || msg.receiver.email;
- dmMap.set(key, {
- key,
- userAId: ids[0],
- userBId: ids[1],
- userA: ids[0] === msg.senderId ? senderName : receiverName,
- userB: ids[1] === msg.receiverId ? receiverName : senderName,
- count: 1,
- lastAt: msg.createdAt.toISOString(),
- });
- }
-
- const directConversations = Array.from(dmMap.values()).sort((a, b) => new Date(b.lastAt).getTime() - new Date(a.lastAt).getTime());
- const groupConversations = groups.map((g) => ({
- id: g.id,
- name: g.name,
- owner: g.owner.pseudo || g.owner.name || g.owner.email,
- members: g._count.members,
- messages: g._count.messages,
- createdAt: g.createdAt.toISOString(),
- }));
+ const groupConversations = Array.from(groupedReports.entries())
+ .map(([targetId, items]) => {
+ const message = groupById.get(targetId);
+ if (!message) return null;
+ return {
+ id: targetId,
+ messageId: targetId,
+ name: message.group.name,
+ owner: message.user.pseudo || message.user.name || message.user.email,
+ preview: decryptMessageContent(message.content),
+ reason: items[0]?.reason ?? null,
+ members: items.length,
+ messages: 1,
+ createdAt: message.createdAt.toISOString(),
+ };
+ })
+ .filter((item): item is NonNullable<typeof item> => !!item)
+ .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
  return NextResponse.json({ directConversations, groupConversations });
 }
@@ -79,27 +103,22 @@ export async function DELETE(request: NextRequest) {
  if (!admin) return NextResponse.json({ error: 'Accès refusé' }, { status: 403 });
 
  try {
- const { type, userAId, userBId, groupId } = await request.json();
+ const { type, messageId, groupId } = await request.json();
 
  if (type === 'direct') {
- if (!userAId || !userBId) return NextResponse.json({ error: 'userAId et userBId requis' }, { status: 400 });
- const result = await prisma.message.deleteMany({
- where: {
- OR: [
- { senderId: userAId, receiverId: userBId },
- { senderId: userBId, receiverId: userAId },
- ],
- },
- });
- await logAdminAction(admin.userId, 'admin.conversation.delete_direct', `userAId=${userAId} userBId=${userBId} deleted=${result.count}`);
- return NextResponse.json({ success: true, deleted: result.count });
+ if (!messageId) return NextResponse.json({ error: 'messageId requis' }, { status: 400 });
+ await prisma.message.delete({ where: { id: messageId } });
+ await prisma.report.deleteMany({ where: { targetType: 'message', targetId: messageId } });
+ await logAdminAction(admin.userId, 'admin.conversation.delete_direct', `messageId=${messageId}`);
+ return NextResponse.json({ success: true, deleted: 1 });
  }
 
  if (type === 'group') {
- if (!groupId) return NextResponse.json({ error: 'groupId requis' }, { status: 400 });
- await prisma.group.delete({ where: { id: groupId } });
- await logAdminAction(admin.userId, 'admin.conversation.delete_group', `groupId=${groupId}`);
- return NextResponse.json({ success: true });
+ if (!groupId) return NextResponse.json({ error: 'messageId requis' }, { status: 400 });
+ await prisma.groupMessage.delete({ where: { id: groupId } });
+ await prisma.report.deleteMany({ where: { targetType: 'message', targetId: groupId } });
+ await logAdminAction(admin.userId, 'admin.conversation.delete_group', `messageId=${groupId}`);
+ return NextResponse.json({ success: true, deleted: 1 });
  }
 
  return NextResponse.json({ error: 'type invalide' }, { status: 400 });

@@ -4,8 +4,8 @@ import { prisma } from '@/lib/prisma';
 import { put } from '@vercel/blob';
 import { logApiCall } from '@/lib/api-logger';
 
-const MAX_SIZE = 80 * 1024 * 1024; // 80 MB
-const ALLOWED_TYPES = ['video/mp4', 'video/webm', 'video/quicktime'];
+const MAX_SIZE = 200 * 1024 * 1024; // 200 MB
+const ALLOWED_TYPES = ['video/mp4', 'video/webm', 'video/quicktime', 'application/zip'];
 
 function sanitizeName(name: string): string {
  return name.replace(/[^a-zA-Z0-9._-]/g, '_');
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
  return NextResponse.json({ error: 'Format video non supporte (mp4, webm, mov)' }, { status: 400 });
  }
  if (file.size > MAX_SIZE) {
- return NextResponse.json({ error: 'Video trop volumineuse (max 80 MB)' }, { status: 400 });
+ return NextResponse.json({ error: 'Video trop volumineuse (max 200 MB)' }, { status: 400 });
  }
 
  const performance = await prisma.performance.findUnique({ where: { id: performanceId } });

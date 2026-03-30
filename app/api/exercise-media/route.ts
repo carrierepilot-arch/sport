@@ -3,6 +3,8 @@ import OpenAI from 'openai';
 import { verifyToken } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { logApiCall } from '@/lib/api-logger';
+import { findCatalogExerciseMedia, normalizeExerciseName, toExerciseMediaSlug } from '@/lib/exercise-media';
+import { findBestNameMatch, listCatalogCandidates, scoreExerciseNameMatch } from '@/lib/exercise-matching';
 
 type ExerciseDbEntry = {
  name?: string;
@@ -11,6 +13,51 @@ type ExerciseDbEntry = {
  target?: string;
  instructions?: string[];
 };
+
+type ExerciseTranslationRow = {
+ id: string;
+ sourceName: string;
+ translatedName: string;
+ translatedDescription: string | null;
+ gifUrl: string | null;
+ instructionsFr: string | null;
+ category?: string | null;
+ metadata?: unknown;
+ sourceApi: string;
+};
+
+async function findBestExerciseTranslation(query: string): Promise<ExerciseTranslationRow | null> {
+ const normalized = normalizeExerciseName(query);
+ const exact = await prisma.exerciseTranslation.findUnique({ where: { sourceName: normalized } });
+ if (exact) return exact as ExerciseTranslationRow;
+
+ const all = await prisma.exerciseTranslation.findMany({
+  select: {
+   id: true,
+   sourceName: true,
+   translatedName: true,
+   translatedDescription: true,
+   gifUrl: true,
+   instructionsFr: true,
+   category: true,
+   metadata: true,
+   sourceApi: true,
+  },
+ });
+
+ let best: { row: ExerciseTranslationRow; score: number } | null = null;
+ for (const row of all as ExerciseTranslationRow[]) {
+  const metadata = typeof row.metadata === 'object' && row.metadata ? row.metadata as Record<string, unknown> : {};
+  const aliases = Array.isArray(metadata.aliases) ? metadata.aliases.filter((value): value is string => typeof value === 'string') : [];
+  const candidates = [row.sourceName, row.translatedName, ...aliases].filter(Boolean);
+  for (const candidate of candidates) {
+   const score = scoreExerciseNameMatch(query, candidate);
+   if (!best || score > best.score) best = { row, score };
+  }
+ }
+
+ return best && best.score >= 0.68 ? best.row : null;
+}
 
 async function maybeTranslateToEnglish(text: string): Promise<string> {
  if (!text.trim()) return text;
@@ -111,22 +158,41 @@ async function maybeTranslateToFrench(text: string, userId?: string | null): Pro
 export async function GET(req: NextRequest) {
  const q = (new URL(req.url).searchParams.get('name') || '').trim();
  if (!q) return NextResponse.json({ error: 'name requis' }, { status: 400 });
- const normalizedName = q.toLowerCase();
+ const normalizedName = normalizeExerciseName(q);
+ const mediaSlug = toExerciseMediaSlug(q);
 
  const token = req.headers.get('authorization')?.replace('Bearer ', '');
  const payload = token ? verifyToken(token) : null;
 
- const cached = await prisma.exerciseTranslation.findUnique({
- where: { sourceName: normalizedName },
+ const catalogMedia = findCatalogExerciseMedia(q);
+ const supabaseBaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || '';
+ const supabaseBucket = process.env.NEXT_PUBLIC_SUPABASE_EXERCISE_BUCKET?.trim() || process.env.SUPABASE_EXERCISE_BUCKET?.trim() || 'exercise-media';
+
+ if (catalogMedia) {
+ return NextResponse.json({
+ media: {
+ name: catalogMedia.label,
+	gifUrl: catalogMedia.supabaseUrl || (supabaseBaseUrl ? `${supabaseBaseUrl}/storage/v1/object/public/${supabaseBucket}/${mediaSlug}.webp` : null),
+ animationFrames: catalogMedia.frames ?? null,
+ bodyPart: null,
+ target: null,
+ instructionFr: catalogMedia.instructionFr || null,
+ source: catalogMedia.supabaseUrl || supabaseBaseUrl ? 'supabase' : 'offline-catalog',
+ },
  });
- if (cached) {
+ }
+
+ const cached = await findBestExerciseTranslation(q);
+ if (cached?.gifUrl) {
  return NextResponse.json({
  media: {
  name: cached.translatedName,
  gifUrl: cached.gifUrl || null,
+  animationFrames: null,
  bodyPart: null,
- target: null,
+ target: cached.category || null,
  instructionFr: cached.instructionsFr || cached.translatedDescription || null,
+  source: cached.gifUrl?.includes('supabase') ? 'supabase' : 'cache',
  },
  });
  }
@@ -161,6 +227,20 @@ export async function GET(req: NextRequest) {
  }
  }
 
+ if (!item && cached) {
+ return NextResponse.json({
+ media: {
+ name: cached.translatedName,
+ gifUrl: cached.gifUrl || null,
+  animationFrames: null,
+ bodyPart: null,
+ target: cached.category || null,
+ instructionFr: cached.instructionsFr || cached.translatedDescription || null,
+  source: 'cache',
+ },
+ });
+ }
+
  if (!item) return NextResponse.json({ media: null });
 
  const instructionRaw = item.instructions?.slice(0, 2).join(' ') || '';
@@ -189,9 +269,11 @@ export async function GET(req: NextRequest) {
  media: {
  name: translatedName.text || item.name || q,
  gifUrl: item.gifUrl || null,
+	animationFrames: null,
  bodyPart: item.bodyPart || null,
  target: item.target || null,
  instructionFr: translatedInstruction.text || null,
+	source: 'exerciseDB',
  },
  });
  } catch {

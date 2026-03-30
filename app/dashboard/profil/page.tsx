@@ -1,13 +1,59 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { UserAvatar } from '@/components/UserAvatar';
 
 interface BadgeItem {
  id: string;
  code: string;
  label: string;
  earnedAt: string;
+}
+
+interface BadgeProgress {
+ unlockedCount: number;
+ totalBadgesAvailable: number;
+ profile: {
+ level: string;
+ xp: number;
+ completedSessions: number;
+ loginStreak: number;
+ };
+ nextMilestones: {
+ sessions: number;
+ streak: number;
+ xp: number;
+ };
+}
+
+interface SocialProfile {
+ id: string;
+ pseudo: string;
+ name: string | null;
+ profileImageUrl?: string | null;
+ profileVisibility?: 'public' | 'private';
+ level: string;
+ xp: number;
+ verified: boolean;
+ isMe: boolean;
+ followedByMe: boolean;
+ counts: {
+ followers: number;
+ following: number;
+ posts: number;
+ weeklyPosts: number;
+ weeklySessions: number;
+ badges: number;
+ validatedPerformances: number;
+ };
+ bestPerformances: Array<{
+ exercise: string;
+ score: number;
+ unit: string;
+ spotName: string;
+ spotCity: string | null;
+ }>;
 }
 
 interface AllBadgeDef {
@@ -77,6 +123,13 @@ export default function ProfilPage() {
  const [selectedBadge, setSelectedBadge] = useState<string | null>(null);
  const [totalSessions, setTotalSessions] = useState(0);
  const [totalWorkouts, setTotalWorkouts] = useState(0);
+ const [badgeProgress, setBadgeProgress] = useState<BadgeProgress | null>(null);
+ const [socialProfile, setSocialProfile] = useState<SocialProfile | null>(null);
+ const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
+ const [profileVisibility, setProfileVisibility] = useState<'public' | 'private'>('public');
+ const [uploadingAvatar, setUploadingAvatar] = useState(false);
+ const formRef = useRef<HTMLFormElement>(null);
+ const avatarInputRef = useRef<HTMLInputElement>(null);
  const router = useRouter();
 
  useEffect(() => {
@@ -93,6 +146,8 @@ export default function ProfilPage() {
  setPseudo(data.user.pseudo ?? '');
  setUserEmail(data.user.email ?? '');
  setLevel(data.user.level ?? 'intermediaire');
+ setProfileImageUrl(data.user.profileImageUrl ?? null);
+ setProfileVisibility(data.user.profileVisibility === 'private' ? 'private' : 'public');
  localStorage.setItem('user', JSON.stringify(data.user));
  }
  })
@@ -114,6 +169,26 @@ export default function ProfilPage() {
  fetch('/api/badges', { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } })
  .then(r => r.json())
  .then(data => { if (data.badges) setBadges(data.badges); })
+ .catch(() => {});
+
+ fetch('/api/badges', { headers: { Authorization: `Bearer ${token}` } })
+ .then(r => r.json())
+ .then(data => {
+ if (data.badges) setBadges(data.badges);
+ if (data.progress) setBadgeProgress(data.progress);
+ })
+ .catch(() => {});
+
+ fetch('/api/social/profile', { headers: { Authorization: `Bearer ${token}` } })
+ .then(r => r.json())
+ .then(data => {
+ if (data.profile) {
+ setSocialProfile(data.profile);
+ if (data.profile.isMe && (data.profile.profileVisibility === 'private' || data.profile.profileVisibility === 'public')) {
+ setProfileVisibility(data.profile.profileVisibility);
+ }
+ }
+ })
  .catch(() => {});
 
  // Load physical data
@@ -150,6 +225,41 @@ export default function ProfilPage() {
  .catch(() => {});
  }, []);
 
+ const triggerAvatarPicker = () => {
+ if (!uploadingAvatar) avatarInputRef.current?.click();
+ };
+
+ const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+ const file = event.target.files?.[0];
+ if (!file) return;
+ const token = localStorage.getItem('token');
+ if (!token) return;
+ setUploadingAvatar(true);
+ setFeedback(null);
+ try {
+ const formData = new FormData();
+ formData.append('avatar', file);
+ const response = await fetch('/api/user/avatar', {
+ method: 'POST',
+ headers: { Authorization: `Bearer ${token}` },
+ body: formData,
+ });
+ const data = await response.json().catch(() => ({}));
+ if (response.ok && data.user) {
+ setProfileImageUrl(data.profileImageUrl ?? null);
+ localStorage.setItem('user', JSON.stringify(data.user));
+ setFeedback({ ok: true, msg: 'Photo de profil mise a jour' });
+ } else {
+ setFeedback({ ok: false, msg: data.error ?? 'Impossible de mettre a jour la photo' });
+ }
+ } catch {
+ setFeedback({ ok: false, msg: 'Erreur reseau pendant l upload de la photo' });
+ } finally {
+ setUploadingAvatar(false);
+ event.target.value = '';
+ }
+ };
+
  const handleSave = async (e: React.FormEvent) => {
  e.preventDefault();
  setSaving(true);
@@ -160,7 +270,7 @@ export default function ProfilPage() {
  fetch('/api/user/update', {
  method: 'PATCH',
  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
- body: JSON.stringify({ pseudo, name }),
+ body: JSON.stringify({ pseudo, name, profileVisibility }),
  }),
  weight || height
  ? fetch('/api/user/physical', {
@@ -202,19 +312,29 @@ export default function ProfilPage() {
  <main className="flex-1 px-4 py-6 sm:px-8 sm:py-10">
  <div className="max-w-4xl">
  <div className="mb-5">
+ <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
  <h1 className="ios-section-title text-gray-900">Profil</h1>
+ <div className="flex flex-wrap gap-2">
+ <button onClick={() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })} className="px-4 py-2.5 rounded-xl bg-gray-900 text-sm font-semibold text-white hover:bg-gray-700 transition">Modifier le profil</button>
+ <button onClick={triggerAvatarPicker} disabled={uploadingAvatar} className="px-4 py-2.5 rounded-xl border border-gray-300 bg-white text-sm font-semibold text-gray-700 hover:bg-gray-50 transition disabled:opacity-60">{uploadingAvatar ? 'Upload...' : 'Modifier la photo de profil'}</button>
+ <input ref={avatarInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleAvatarUpload} />
+ </div>
+ </div>
  </div>
 
  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
  {/* Colonne gauche — avatar */}
  <div className="bg-white border border-gray-200 rounded-xl p-6 flex flex-col items-center gap-5">
- <div className="w-20 h-20 bg-gray-900 rounded-full flex items-center justify-center text-white text-2xl font-bold">
- {(pseudo || name || userEmail) ? (pseudo || name || userEmail)[0].toUpperCase() : 'U'}
- </div>
+ <UserAvatar src={profileImageUrl} name={pseudo || name || userEmail} size="xl" />
  <div className="text-center">
  <p className="font-semibold text-gray-900">{pseudo || name || 'Utilisateur'}</p>
  <p className="text-xs text-gray-400 mt-0.5">{userEmail}</p>
+ {socialProfile?.verified && (
+ <span className="mt-2 inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-sky-700">
+ Profil verifie
+ </span>
+ )}
  </div>
  <span className={`text-xs font-semibold px-3 py-1.5 rounded-full border ${
  level === 'elite' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
@@ -227,6 +347,9 @@ export default function ProfilPage() {
  {[
  { label: 'Programmes', value: String(totalWorkouts) },
  { label: 'Séances réalisées', value: String(totalSessions) },
+ { label: 'Followers', value: String(socialProfile?.counts.followers ?? 0) },
+ { label: 'Abonnements', value: String(socialProfile?.counts.following ?? 0) },
+ { label: 'Publications', value: String(socialProfile?.counts.posts ?? 0) },
  ].map((s) => (
  <div key={s.label} className="flex justify-between text-sm">
  <span className="text-gray-500">{s.label}</span>
@@ -249,7 +372,7 @@ export default function ProfilPage() {
 
  {/* Colonne droite — formulaire */}
  <div className="md:col-span-2 bg-white border border-gray-200 rounded-xl p-6">
- <form onSubmit={handleSave} className="space-y-0">
+ <form ref={formRef} onSubmit={handleSave} className="space-y-0">
 
  {/* Section identite */}
  <div className="mb-6">
@@ -321,6 +444,20 @@ export default function ProfilPage() {
  </select>
  </div>
 
+ <div className="mb-6">
+ <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Confidentialite</h2>
+ <label className="block text-sm font-medium text-gray-700 mb-1">Visibilite du profil</label>
+ <select
+ value={profileVisibility}
+ onChange={(e) => setProfileVisibility(e.target.value === 'private' ? 'private' : 'public')}
+ className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none transition text-sm text-gray-900 bg-white"
+ >
+ <option value="public">Public</option>
+ <option value="private">Prive</option>
+ </select>
+ <p className="text-xs text-gray-400 mt-1">En mode prive, seuls vous, vos abonnes, vos amis et les admins peuvent voir vos publications.</p>
+ </div>
+
  {/* Submit */}
  <div className="flex items-center gap-3 pt-2">
  <button
@@ -342,6 +479,54 @@ export default function ProfilPage() {
  )}
  </div>
  </form>
+ </div>
+ </div>
+
+ <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+ <div className="bg-white border border-gray-200 rounded-xl p-6">
+ <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Progression sociale et hebdo</h2>
+ <div className="grid grid-cols-2 gap-3">
+ <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+ <p className="text-xs text-gray-500">XP</p>
+ <p className="mt-1 text-xl font-black text-gray-900">{badgeProgress?.profile.xp ?? socialProfile?.xp ?? 0}</p>
+ </div>
+ <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+ <p className="text-xs text-gray-500">Streak</p>
+ <p className="mt-1 text-xl font-black text-gray-900">{badgeProgress?.profile.loginStreak ?? 0} j</p>
+ </div>
+ <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+ <p className="text-xs text-gray-500">Seances 7j</p>
+ <p className="mt-1 text-xl font-black text-gray-900">{socialProfile?.counts.weeklySessions ?? 0}</p>
+ </div>
+ <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+ <p className="text-xs text-gray-500">Posts 7j</p>
+ <p className="mt-1 text-xl font-black text-gray-900">{socialProfile?.counts.weeklyPosts ?? 0}</p>
+ </div>
+ </div>
+ {badgeProgress && (
+ <div className="mt-4 rounded-xl border border-sky-100 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+ <p className="font-semibold">Prochains paliers</p>
+ <p className="mt-1">Sessions: {badgeProgress.nextMilestones.sessions} · Streak: {badgeProgress.nextMilestones.streak} · XP: {badgeProgress.nextMilestones.xp}</p>
+ </div>
+ )}
+ </div>
+
+ <div className="bg-white border border-gray-200 rounded-xl p-6">
+ <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Records publics</h2>
+ <div className="space-y-3">
+ {(socialProfile?.bestPerformances ?? []).length === 0 && (
+ <p className="text-sm text-gray-500">Aucune performance publique validee pour le moment.</p>
+ )}
+ {(socialProfile?.bestPerformances ?? []).map((perf) => (
+ <div key={perf.exercise} className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+ <div className="flex items-center justify-between gap-3">
+ <p className="text-sm font-semibold text-gray-900">{perf.exercise}</p>
+ <p className="text-sm font-black text-gray-900">{perf.score} {perf.unit}</p>
+ </div>
+ <p className="mt-1 text-xs text-gray-500">{perf.spotName}{perf.spotCity ? `, ${perf.spotCity}` : ''}</p>
+ </div>
+ ))}
+ </div>
  </div>
  </div>
 

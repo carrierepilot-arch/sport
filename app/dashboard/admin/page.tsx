@@ -8,6 +8,8 @@ interface UserRow {
  email: string;
  name: string | null;
  pseudo: string | null;
+ profileImageUrl?: string | null;
+ profileVisibility?: 'public' | 'private';
  isAdmin: boolean;
  adminLevel?: number;
  suspended: boolean;
@@ -66,20 +68,52 @@ interface StorageStats {
  fileCount?: number;
 }
 
+type FileCategory = 'video' | 'image' | 'audio' | 'other';
+
+interface SupabaseBucketStats {
+ name: string;
+ fileCount: number;
+ totalBytes: number;
+ byType: Partial<Record<FileCategory, { count: number; bytes: number }>>;
+ topFiles: { path: string; size: number; mimeType: string }[];
+}
+
+interface SupabaseStats {
+ updatedAt: string;
+ storage: {
+ usedBytes: number;
+ quotaBytes: number;
+ remainingBytes: number;
+ usedPercent: number;
+ fileCount: number;
+ };
+ bandwidth: { quotaBytes: number; note: string };
+ limits: {
+ storage: { bytes: number; label: string };
+ bandwidth: { bytes: number; label: string };
+ database: { bytes: number; label: string };
+ };
+ buckets: SupabaseBucketStats[];
+}
+
 interface DirectConversationRow {
  key: string;
- userAId: string;
- userBId: string;
- userA: string;
- userB: string;
- count: number;
+ messageId: string;
+ sender: string;
+ recipient: string;
+ preview: string;
+ reason: string | null;
+ reportCount: number;
  lastAt: string;
 }
 
 interface GroupConversationRow {
  id: string;
+ messageId: string;
  name: string;
  owner: string;
+ preview: string;
+ reason: string | null;
  members: number;
  messages: number;
  createdAt: string;
@@ -204,6 +238,7 @@ function actionLabel(action: string): { label: string; color: string } {
  'admin.user.suspend_toggle': { label: 'Admin: suspension', color: 'bg-red-50 text-red-700' },
  'admin.user.reset_password': { label: 'Admin: reset mdp', color: 'bg-red-50 text-red-700' },
  'admin.user.delete': { label: 'Admin: suppression', color: 'bg-red-50 text-red-700' },
+ 'admin.user.profile_moderation': { label: 'Admin: moderation profil', color: 'bg-red-50 text-red-700' },
  'admin.performance.update': { label: 'Admin: modif perf', color: 'bg-red-50 text-red-700' },
  'admin.performance.delete': { label: 'Admin: suppression perf', color: 'bg-red-50 text-red-700' },
  'admin.performance.video_delete': { label: 'Admin: suppression video', color: 'bg-red-50 text-red-700' },
@@ -242,7 +277,13 @@ export default function AdminPage() {
  const [sortField, setSortField] = useState<'createdAt' | 'messages' | 'name'>('createdAt');
  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
  const [performances, setPerformances] = useState<PerfRow[]>([]);
+ const [performanceSearch, setPerformanceSearch] = useState('');
+ const [performanceStatusFilter, setPerformanceStatusFilter] = useState('');
+ const [performanceSort, setPerformanceSort] = useState<'recent' | 'score_desc' | 'score_asc'>('recent');
  const [storageStats, setStorageStats] = useState<StorageStats | null>(null);
+ const [supabaseStats, setSupabaseStats] = useState<SupabaseStats | null>(null);
+ const [supabaseStatsLoading, setSupabaseStatsLoading] = useState(false);
+ const [supabaseStatsError, setSupabaseStatsError] = useState<string | null>(null);
  const [editingPerf, setEditingPerf] = useState<string | null>(null);
  const [editScore, setEditScore] = useState('');
  const [editStatus, setEditStatus] = useState('');
@@ -425,6 +466,73 @@ export default function AdminPage() {
  setActionLoading(null);
  };
 
+ const moderatePseudo = async (user: UserRow) => {
+	 const nextPseudo = window.prompt('Nouveau pseudo:', user.pseudo ?? '');
+	 if (nextPseudo === null) return;
+	 const cleaned = nextPseudo.trim();
+	 if (!cleaned) return;
+	 setActionLoading(user.id);
+	 try {
+		 const res = await fetch(`/api/admin/users/${user.id}`, {
+			 method: 'PATCH',
+			 headers: authHeader(),
+			 body: JSON.stringify({ pseudo: cleaned }),
+		 });
+		 const data = await res.json().catch(() => ({}));
+		 if (!res.ok) {
+			 alert(data.error || 'Erreur');
+		 } else {
+			 setUsers(prev => prev.map(u => (u.id === user.id ? { ...u, pseudo: data.user?.pseudo ?? cleaned } : u)));
+		 }
+	 } catch {
+		 alert('Erreur reseau');
+	 }
+	 setActionLoading(null);
+ };
+
+ const moderateName = async (user: UserRow) => {
+	 const nextName = window.prompt('Nouveau nom (laisser vide pour supprimer):', user.name ?? '');
+	 if (nextName === null) return;
+	 setActionLoading(user.id);
+	 try {
+		 const res = await fetch(`/api/admin/users/${user.id}`, {
+			 method: 'PATCH',
+			 headers: authHeader(),
+			 body: JSON.stringify({ name: nextName }),
+		 });
+		 const data = await res.json().catch(() => ({}));
+		 if (!res.ok) {
+			 alert(data.error || 'Erreur');
+		 } else {
+			 setUsers(prev => prev.map(u => (u.id === user.id ? { ...u, name: data.user?.name ?? null } : u)));
+		 }
+	 } catch {
+		 alert('Erreur reseau');
+	 }
+	 setActionLoading(null);
+ };
+
+ const removeProfilePhoto = async (user: UserRow) => {
+	 if (!confirm(`Supprimer la photo de profil de ${user.email} ?`)) return;
+	 setActionLoading(user.id);
+	 try {
+		 const res = await fetch(`/api/admin/users/${user.id}`, {
+			 method: 'PATCH',
+			 headers: authHeader(),
+			 body: JSON.stringify({ removeProfileImage: true }),
+		 });
+		 const data = await res.json().catch(() => ({}));
+		 if (!res.ok) {
+			 alert(data.error || 'Erreur');
+		 } else {
+			 setUsers(prev => prev.map(u => (u.id === user.id ? { ...u, profileImageUrl: data.user?.profileImageUrl ?? null } : u)));
+		 }
+	 } catch {
+		 alert('Erreur reseau');
+	 }
+	 setActionLoading(null);
+ };
+
  const sendAdminMessage = async (userId: string, email: string) => {
  const text = prompt(`Message admin a envoyer a ${email}`);
  if (!text || !text.trim()) return;
@@ -446,6 +554,30 @@ export default function AdminPage() {
  alert('Erreur reseau');
  }
  setActionLoading(null);
+ };
+
+ const deleteReportedContent = async (report: ReportRow) => {
+	 if (report.targetType !== 'feed_post') {
+		 alert('Action rapide dispo uniquement pour les posts du feed.');
+		 return;
+	 }
+	 if (!confirm('Supprimer ce contenu signale ?')) return;
+	 setActionLoading(report.id);
+	 try {
+		 const res = await fetch(`/api/feed/${report.targetId}`, {
+			 method: 'DELETE',
+			 headers: authHeader(),
+		 });
+		 const data = await res.json().catch(() => ({}));
+		 if (!res.ok) {
+			 alert(data.error || 'Erreur lors de la moderation');
+		 } else {
+			 setReports(prev => prev.filter(r => r.targetId !== report.targetId));
+		 }
+	 } catch {
+		 alert('Erreur reseau');
+	 }
+	 setActionLoading(null);
  };
 
  const resetPassword = async (userId: string, email: string) => {
@@ -564,9 +696,9 @@ export default function AdminPage() {
  setApiTestLoading(false);
  };
 
- const deleteConversation = async (payload: { type: 'direct'; userAId: string; userBId: string } | { type: 'group'; groupId: string }) => {
+ const deleteConversation = async (payload: { type: 'direct'; messageId: string } | { type: 'group'; groupId: string }) => {
  if (!confirm('Supprimer cette conversation ? Cette action est irréversible.')) return;
- setActionLoading(payload.type === 'direct' ? `${payload.userAId}:${payload.userBId}` : payload.groupId);
+ setActionLoading(payload.type === 'direct' ? payload.messageId : payload.groupId);
  try {
  const res = await fetch('/api/admin/conversations', {
  method: 'DELETE',
@@ -815,6 +947,27 @@ export default function AdminPage() {
  return l.action === logFilter;
  });
 
+ const filteredPerformances = performances
+ .filter((performance) => {
+ if (performanceStatusFilter && performance.status !== performanceStatusFilter) return false;
+ if (!performanceSearch.trim()) return true;
+ const search = performanceSearch.toLowerCase();
+ return [
+ performance.exercise,
+ performance.status,
+ performance.user.pseudo ?? '',
+ performance.user.name ?? '',
+ performance.user.email,
+ performance.spot?.name ?? '',
+ performance.spot?.city ?? '',
+ ].some((value) => value.toLowerCase().includes(search));
+ })
+ .sort((left, right) => {
+ if (performanceSort === 'score_desc') return right.score - left.score;
+ if (performanceSort === 'score_asc') return left.score - right.score;
+ return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
+ });
+
  const workoutGenerations = logs.filter(l => l.action === 'workout_generated').length;
  const aiApiCalls = apiStats?.apiTotals?.openai ?? 0;
  const exerciseDbApiCalls = apiStats?.apiTotals?.exerciseDB ?? 0;
@@ -870,6 +1023,35 @@ export default function AdminPage() {
  })
  .catch(() => router.push('/dashboard'));
  }, [charger, router]);
+
+ const loadSupabaseStats = useCallback(async () => {
+ setSupabaseStatsLoading(true);
+ setSupabaseStatsError(null);
+ try {
+ const res = await fetch('/api/admin/supabase-stats', { headers: authHeader() });
+ if (!res.ok) {
+ let msg = `HTTP ${res.status}`;
+ if (res.status === 429) msg = 'Trop de requêtes. Patientez quelques secondes.';
+ if (res.status === 403) msg = 'Accès non autorisé.';
+ if (res.status >= 500) msg = 'Erreur serveur. Réessayez.';
+ throw new Error(msg);
+ }
+ const data: SupabaseStats = await res.json();
+ setSupabaseStats(data);
+ } catch (err) {
+ console.error('[supabase-stats]', err);
+ setSupabaseStatsError(String(err));
+ } finally {
+ setSupabaseStatsLoading(false);
+ }
+ }, []);
+
+ useEffect(() => {
+ if (tab !== 'performances') return;
+ loadSupabaseStats();
+ const interval = setInterval(loadSupabaseStats, 60_000);
+ return () => clearInterval(interval);
+ }, [tab, loadSupabaseStats]);
 
  if (loading) {
  return (
@@ -1164,6 +1346,12 @@ export default function AdminPage() {
  )}
  {!u.isAdmin && (
  <>
+ <button onClick={() => moderatePseudo(u)} disabled={actionLoading === u.id}
+ className="px-2 py-1 text-xs font-medium rounded-lg border border-fuchsia-200 text-fuchsia-700 hover:bg-fuchsia-50 transition disabled:opacity-50">Pseudo</button>
+ <button onClick={() => moderateName(u)} disabled={actionLoading === u.id}
+ className="px-2 py-1 text-xs font-medium rounded-lg border border-violet-200 text-violet-700 hover:bg-violet-50 transition disabled:opacity-50">Nom</button>
+ <button onClick={() => removeProfilePhoto(u)} disabled={actionLoading === u.id}
+ className="px-2 py-1 text-xs font-medium rounded-lg border border-rose-200 text-rose-700 hover:bg-rose-50 transition disabled:opacity-50">Photo</button>
  <button onClick={() => sendAdminMessage(u.id, u.email)} disabled={actionLoading === u.id}
  className="px-2 py-1 text-xs font-medium rounded-lg border border-blue-200 text-blue-700 hover:bg-blue-50 transition disabled:opacity-50">Msg</button>
  <button onClick={() => toggleSuspend(u.id, !u.suspended)} disabled={actionLoading === u.id}
@@ -1229,6 +1417,12 @@ export default function AdminPage() {
  )}
  {!u.isAdmin && (
  <>
+ <button onClick={() => moderatePseudo(u)} disabled={actionLoading === u.id}
+ className="px-3 py-1.5 text-xs font-medium rounded-lg border border-fuchsia-200 text-fuchsia-700 hover:bg-fuchsia-50 transition disabled:opacity-50">Pseudo</button>
+ <button onClick={() => moderateName(u)} disabled={actionLoading === u.id}
+ className="px-3 py-1.5 text-xs font-medium rounded-lg border border-violet-200 text-violet-700 hover:bg-violet-50 transition disabled:opacity-50">Nom</button>
+ <button onClick={() => removeProfilePhoto(u)} disabled={actionLoading === u.id}
+ className="px-3 py-1.5 text-xs font-medium rounded-lg border border-rose-200 text-rose-700 hover:bg-rose-50 transition disabled:opacity-50">Photo</button>
  <button onClick={() => sendAdminMessage(u.id, u.email)} disabled={actionLoading === u.id}
  className="px-3 py-1.5 text-xs font-medium rounded-lg border border-blue-200 text-blue-700 hover:bg-blue-50 transition disabled:opacity-50">Message</button>
  <button onClick={() => toggleSuspend(u.id, !u.suspended)} disabled={actionLoading === u.id}
@@ -1330,20 +1524,165 @@ export default function AdminPage() {
  {/* ── PERFORMANCES ── */}
  {tab === 'performances' && (
  <div className="space-y-4">
+
+ {/* Vercel Blob Monitoring Card */}
+ <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+ <div className="px-4 sm:px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+ <div>
+ <h2 className="text-sm font-semibold text-gray-900">Monitoring Stockage</h2>
+ {supabaseStats && (
+ <p className="text-xs text-gray-400 mt-0.5">
+ Mis à jour il y a {Math.round((Date.now() - new Date(supabaseStats.updatedAt).getTime()) / 1000)}s
+ </p>
+ )}
+ </div>
+ <button
+ onClick={loadSupabaseStats}
+ disabled={supabaseStatsLoading}
+ className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg hover:border-gray-400 transition font-medium text-gray-600 disabled:opacity-40"
+ >
+ {supabaseStatsLoading ? '...' : '↻ Rafraîchir'}
+ </button>
+ </div>
+
+ {supabaseStatsError && (
+ <div className="px-4 sm:px-6 py-3 bg-red-50 border-b border-red-100">
+ <p className="text-xs text-red-600">{supabaseStatsError}</p>
+ </div>
+ )}
+
+ {!supabaseStats && !supabaseStatsLoading && !supabaseStatsError && (
+ <div className="px-4 sm:px-6 py-8 text-center">
+ <p className="text-sm text-gray-400">Cliquez sur Rafraîchir pour charger les stats.</p>
+ </div>
+ )}
+
+ {supabaseStatsLoading && !supabaseStats && (
+ <div className="px-4 sm:px-6 py-8 text-center">
+ <div className="w-5 h-5 border-2 border-gray-300 border-t-gray-700 rounded-full animate-spin mx-auto" />
+ </div>
+ )}
+
+ {supabaseStats && (() => {
+ const { storage, bandwidth, limits, buckets } = supabaseStats;
+ const barColor = storage.usedPercent >= 90 ? 'bg-red-500' : storage.usedPercent >= 70 ? 'bg-amber-500' : 'bg-emerald-500';
+ const catLabels: Record<string, string> = { video: 'Vidéos', image: 'Images', audio: 'Audio', other: 'Autres' };
+ return (
+ <div className="divide-y divide-gray-100">
+ {/* Storage global */}
+ <div className="px-4 sm:px-6 py-4">
+ <div className="flex items-center justify-between mb-2">
+ <span className="text-xs font-medium text-gray-700">Stockage</span>
+ <span className={`text-xs font-semibold ${storage.usedPercent >= 90 ? 'text-red-600' : storage.usedPercent >= 70 ? 'text-amber-600' : 'text-emerald-700'}`}>
+ {formatBytes(storage.usedBytes)} / {limits.storage.label}
+ </span>
+ </div>
+ <div className="h-2 bg-gray-100 rounded-full overflow-hidden mb-1">
+ <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${Math.min(100, storage.usedPercent)}%` }} />
+ </div>
+ <div className="flex items-center justify-between">
+ <span className="text-[11px] text-gray-400">{storage.usedPercent}% utilisé · {storage.fileCount} fichier{storage.fileCount !== 1 ? 's' : ''}</span>
+ <span className="text-[11px] text-gray-400">Restant: {formatBytes(storage.remainingBytes)}</span>
+ </div>
+ </div>
+
+ {/* Per-prefix breakdown */}
+ {buckets.length > 0 && (
+ <div className="px-4 sm:px-6 py-4">
+ <p className="text-xs font-medium text-gray-700 mb-3">Dossiers ({buckets.length})</p>
+ <div className="space-y-3">
+ {buckets.map((b) => {
+ const bPct = limits.storage.bytes > 0 ? Math.round((b.totalBytes / limits.storage.bytes) * 100) : 0;
+ const bColor = bPct >= 90 ? 'bg-red-400' : bPct >= 70 ? 'bg-amber-400' : 'bg-blue-400';
+ return (
+ <div key={b.name}>
+ <div className="flex items-center justify-between mb-1">
+ <span className="text-xs font-medium text-gray-800 font-mono">{b.name}/</span>
+ <span className="text-[11px] text-gray-500">{formatBytes(b.totalBytes)} · {b.fileCount} fichier{b.fileCount !== 1 ? 's' : ''}</span>
+ </div>
+ <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+ <div className={`h-full rounded-full ${bColor}`} style={{ width: `${Math.min(100, bPct)}%` }} />
+ </div>
+ {Object.keys(b.byType).length > 0 && (
+ <div className="flex flex-wrap gap-2 mt-1.5">
+ {(Object.entries(b.byType) as [string, { count: number; bytes: number }][]).map(([cat, info]) => (
+ <span key={cat} className="text-[10px] text-gray-400">
+ {catLabels[cat] ?? cat}: {info.count} · {formatBytes(info.bytes)}
+ </span>
+ ))}
+ </div>
+ )}
+ </div>
+ );
+ })}
+ </div>
+ </div>
+ )}
+
+ {/* Bandwidth note */}
+ <div className="px-4 sm:px-6 py-3 bg-gray-50">
+ <div className="flex items-center justify-between">
+ <span className="text-xs font-medium text-gray-600">Bande passante</span>
+ <span className="text-xs text-gray-500">{limits.bandwidth.label}</span>
+ </div>
+ <p className="text-[11px] text-gray-400 mt-0.5">{bandwidth.note}</p>
+ </div>
+
+ {/* Vercel Hobby plan limits */}
+ <div className="px-4 sm:px-6 py-4">
+ <p className="text-xs font-medium text-gray-700 mb-3">Limites plan Hobby (Vercel)</p>
+ <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+ {[
+ { label: 'Blob storage', value: limits.storage.label },
+ { label: 'Bande passante', value: limits.bandwidth.label },
+ { label: 'Base de données', value: limits.database.label },
+ ].map((item) => (
+ <div key={item.label} className="bg-gray-50 rounded-lg px-3 py-2">
+ <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">{item.label}</p>
+ <p className="text-xs font-semibold text-gray-800 mt-0.5">{item.value}</p>
+ </div>
+ ))}
+ </div>
+ </div>
+ </div>
+ );
+ })()}
+ </div>
+
  <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
  <div className="px-4 sm:px-6 py-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
  <div>
  <h2 className="text-sm font-semibold text-gray-900">Gestion des performances</h2>
- <p className="text-xs text-gray-400 mt-0.5">{performances.length} performance{performances.length !== 1 ? 's' : ''} enregistrée{performances.length !== 1 ? 's' : ''}</p>
+ <p className="text-xs text-gray-400 mt-0.5">{filteredPerformances.length} performance{filteredPerformances.length !== 1 ? 's' : ''} affichée{filteredPerformances.length !== 1 ? 's' : ''}</p>
  </div>
- {storageStats && (
- <div className="text-left sm:text-right">
- <p className="text-xs text-gray-500">Stockage videos</p>
- <p className="text-sm font-semibold text-gray-900">{formatBytes(storageStats.usedBytes)} / {formatBytes(storageStats.quotaBytes)}</p>
- <p className="text-[11px] text-gray-400">Restant: {formatBytes(storageStats.remainingBytes)}</p>
- <p className="text-[11px] text-gray-400">Fichiers: {storageStats.fileCount ?? 0}</p>
  </div>
- )}
+ <div className="px-4 sm:px-6 py-4 border-b border-gray-100 grid grid-cols-1 md:grid-cols-3 gap-3">
+ <input
+ value={performanceSearch}
+ onChange={(e) => setPerformanceSearch(e.target.value)}
+ placeholder="Recherche utilisateur, spot, exercice..."
+ className="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900"
+ />
+ <select
+ value={performanceStatusFilter}
+ onChange={(e) => setPerformanceStatusFilter(e.target.value)}
+ className="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900"
+ >
+ <option value="">Tous les statuts</option>
+ <option value="private">Privée</option>
+ <option value="pending">En attente</option>
+ <option value="validated">Validée</option>
+ <option value="rejected">Rejetée</option>
+ </select>
+ <select
+ value={performanceSort}
+ onChange={(e) => setPerformanceSort(e.target.value as 'recent' | 'score_desc' | 'score_asc')}
+ className="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900"
+ >
+ <option value="recent">Plus récentes</option>
+ <option value="score_desc">Score décroissant</option>
+ <option value="score_asc">Score croissant</option>
+ </select>
  </div>
  {/* Desktop table */}
  <div className="hidden md:block overflow-x-auto">
@@ -1361,10 +1700,10 @@ export default function AdminPage() {
  </tr>
  </thead>
  <tbody className="divide-y divide-gray-50">
- {performances.length === 0 && (
+ {filteredPerformances.length === 0 && (
  <tr><td colSpan={8} className="px-4 py-8 text-center text-sm text-gray-400">Aucune performance</td></tr>
  )}
- {performances.map((p) => (
+ {filteredPerformances.map((p) => (
  <tr key={p.id} className="hover:bg-gray-50">
  <td className="px-3 py-3">
  <p className="text-sm font-medium text-gray-900 truncate max-w-[120px]">{p.user.pseudo ? `@${p.user.pseudo}` : p.user.name ?? p.user.email}</p>
@@ -1450,10 +1789,10 @@ export default function AdminPage() {
  </div>
  {/* Mobile cards */}
  <div className="md:hidden divide-y divide-gray-50">
- {performances.length === 0 && (
+ {filteredPerformances.length === 0 && (
  <p className="px-4 py-8 text-center text-sm text-gray-400">Aucune performance</p>
  )}
- {performances.map((p) => (
+ {filteredPerformances.map((p) => (
  <div key={p.id} className="px-4 py-3 space-y-2">
  <div className="flex items-center justify-between gap-2">
  <p className="text-sm font-medium text-gray-900 truncate">{p.user.pseudo ? `@${p.user.pseudo}` : p.user.name ?? p.user.email}</p>
@@ -2413,47 +2752,49 @@ export default function AdminPage() {
  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
  <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
  <div className="px-4 py-3 border-b border-gray-100">
- <h2 className="text-sm font-semibold text-gray-900"> Conversations privées</h2>
+ <h2 className="text-sm font-semibold text-gray-900">Messages privés signalés</h2>
  </div>
  <div className="divide-y divide-gray-50 max-h-72 overflow-y-auto">
  {directConversations.map((c) => (
  <div key={c.key} className="px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
  <div className="min-w-0">
- <p className="text-sm text-gray-900 truncate">{c.userA} {c.userB}</p>
- <p className="text-xs text-gray-400">{c.count} messages · {fmt(c.lastAt)}</p>
+ <p className="text-sm text-gray-900 truncate">{c.sender} → {c.recipient}</p>
+ <p className="text-xs text-gray-500 truncate">{c.preview}</p>
+ <p className="text-xs text-gray-400">{c.reportCount} signalement{c.reportCount > 1 ? 's' : ''} · {c.reason || 'Sans motif'} · {fmt(c.lastAt)}</p>
  </div>
  <button
- onClick={() => deleteConversation({ type: 'direct', userAId: c.userAId, userBId: c.userBId })}
+ onClick={() => deleteConversation({ type: 'direct', messageId: c.messageId })}
  className="px-2 py-1 text-xs border border-red-200 text-red-600 rounded hover:bg-red-50"
  >
- Supprimer
+ Supprimer message
  </button>
  </div>
  ))}
- {directConversations.length === 0 && <p className="px-4 py-4 text-sm text-gray-400">Aucune conversation privée.</p>}
+ {directConversations.length === 0 && <p className="px-4 py-4 text-sm text-gray-400">Aucun message privé signalé.</p>}
  </div>
  </div>
 
  <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
  <div className="px-4 py-3 border-b border-gray-100">
- <h2 className="text-sm font-semibold text-gray-900"> Conversations de groupe</h2>
+ <h2 className="text-sm font-semibold text-gray-900">Messages de groupe signalés</h2>
  </div>
  <div className="divide-y divide-gray-50 max-h-72 overflow-y-auto">
  {groupConversations.map((g) => (
  <div key={g.id} className="px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
  <div className="min-w-0">
  <p className="text-sm text-gray-900 truncate">{g.name}</p>
- <p className="text-xs text-gray-400">Owner: {g.owner} · {g.members} membres · {g.messages} messages</p>
+ <p className="text-xs text-gray-500 truncate">{g.preview}</p>
+ <p className="text-xs text-gray-400">Auteur: {g.owner} · {g.members} signalement{g.members > 1 ? 's' : ''} · {g.reason || 'Sans motif'}</p>
  </div>
  <button
- onClick={() => deleteConversation({ type: 'group', groupId: g.id })}
+ onClick={() => deleteConversation({ type: 'group', groupId: g.messageId })}
  className="px-2 py-1 text-xs border border-red-200 text-red-600 rounded hover:bg-red-50"
  >
- Supprimer
+ Supprimer message
  </button>
  </div>
  ))}
- {groupConversations.length === 0 && <p className="px-4 py-4 text-sm text-gray-400">Aucun groupe.</p>}
+ {groupConversations.length === 0 && <p className="px-4 py-4 text-sm text-gray-400">Aucun message de groupe signalé.</p>}
  </div>
  </div>
  </div>
@@ -2484,6 +2825,15 @@ export default function AdminPage() {
  {r.reporter.pseudo || r.reporter.name || r.reporter.email} → {r.reportedUser?.pseudo || r.reportedUser?.name || r.reportedUser?.email || `${r.targetType}:${r.targetId}`}
  </p>
  <p className="text-gray-500">{r.targetType} · {r.reason || 'Sans motif'} · {fmt(r.createdAt)}</p>
+ {r.targetType === 'feed_post' && (
+ <button
+ onClick={() => deleteReportedContent(r)}
+ disabled={actionLoading === r.id}
+ className="mt-2 rounded-md border border-red-200 px-2 py-1 text-[11px] font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
+ >
+ {actionLoading === r.id ? 'Suppression...' : 'Supprimer le post'}
+ </button>
+ )}
  </div>
  ))}
  {reports.length === 0 && <p className="text-sm text-gray-400">Aucun signalement.</p>}

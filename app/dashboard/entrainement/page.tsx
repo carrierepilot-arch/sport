@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { ExerciseMotionPreview } from '@/components/ExerciseMotionPreview';
+import { fetchExerciseMedia } from '@/lib/exercise-media-client';
 
 // ─── Types ───
 type Objectif = 'Force' | 'Cardio' | 'Endurance' | 'Hypertrophie';
@@ -47,6 +49,7 @@ interface ExerciseDBItem {
  muscles: { name_en: string }[];
  equipment: { name: string }[];
  gifUrl?: string | null;
+ animationFrames?: string[] | null;
  instructionFr?: string | null;
 }
 
@@ -601,7 +604,7 @@ function SessionPlayer({ jour, onFinish, onClose }: {
  const [setIdx, setSetIdx] = useState(0);
  const [phase, setPhase] = useState<'exercise' | 'fail_input' | 'rest' | 'done'>('exercise');
  const [failReps, setFailReps] = useState('');
- const [exerciseMediaMap, setExerciseMediaMap] = useState<Record<string, { gifUrl?: string | null; instructionFr?: string | null }>>({});
+ const [exerciseMediaMap, setExerciseMediaMap] = useState<Record<string, { gifUrl?: string | null; animationFrames?: string[] | null; instructionFr?: string | null }>>({});
  const [mediaLoading, setMediaLoading] = useState(false);
  const loadedMediaRef = useRef<Set<string>>(new Set());
  const [results, setResults] = useState<ExerciceResult[]>(() =>
@@ -619,16 +622,14 @@ function SessionPlayer({ jour, onFinish, onClose }: {
  if (showLoading) setMediaLoading(true);
  try {
  const token = localStorage.getItem('token');
- const res = await fetch(`/api/exercise-media?name=${encodeURIComponent(exerciseName)}`, {
- headers: token ? { Authorization: `Bearer ${token}` } : {},
- });
- const data = await res.json();
- if (data?.media) {
+ const media = await fetchExerciseMedia(exerciseName, token);
+ if (media) {
  setExerciseMediaMap((prev) => ({
  ...prev,
  [key]: {
- gifUrl: data.media.gifUrl || null,
- instructionFr: data.media.instructionFr || null,
+ gifUrl: media.gifUrl || null,
+ animationFrames: media.animationFrames || null,
+ instructionFr: media.instructionFr || null,
  },
  }));
  }
@@ -800,21 +801,23 @@ function SessionPlayer({ jour, onFinish, onClose }: {
  {(() => {
  const mediaKey = exo.nom.trim().toLowerCase();
  const gifUrl = exerciseMediaMap[mediaKey]?.gifUrl || '';
+ const animationFrames = exerciseMediaMap[mediaKey]?.animationFrames || [];
  const animationType = inferExerciseAnimationType(exo.nom);
  return (
  <>
  {mediaLoading && (
  <div className="w-full h-40 mb-3 rounded-2xl border border-gray-200 bg-gray-100 animate-pulse" />
  )}
- {!mediaLoading && !!gifUrl && (
- <img
- src={gifUrl}
- alt={`Animation ${exo.nom}`}
- className="w-full h-40 object-cover rounded-2xl border border-gray-200 mb-3"
- loading="eager"
+ {!mediaLoading && (gifUrl || animationFrames.length > 0) && (
+ <ExerciseMotionPreview
+ title={`Animation ${exo.nom}`}
+ gifUrl={gifUrl}
+ frames={animationFrames}
+ className="mb-3 overflow-hidden rounded-2xl border border-gray-200"
+ imgClassName="w-full h-40 object-contain bg-slate-50"
  />
  )}
- {!mediaLoading && !gifUrl && (
+ {!mediaLoading && !gifUrl && animationFrames.length === 0 && (
  <FallbackExerciseAnimation type={animationType} label={exo.nom} />
  )}
  </>
@@ -984,6 +987,8 @@ export default function EntrainementPage() {
  const [shareOpen, setShareOpen] = useState(false);
  const [shareTarget, setShareTarget] = useState<string | null>(null);
  const [shareSent, setShareSent] = useState(false);
+ const [shareSending, setShareSending] = useState(false);
+ const [shareError, setShareError] = useState<string | null>(null);
  const [shareWorkoutId, setShareWorkoutId] = useState<string | null>(null);
  const [creationMode, setCreationMode] = useState(false);
  const [entrainementTab, setEntrainementTab] = useState<'config' | 'seances' | 'defis' | 'equipement'>('seances');
@@ -1253,6 +1258,37 @@ export default function EntrainementPage() {
 
  useEffect(() => { if (entrainementTab === 'defis') loadChallenges(); }, [entrainementTab, loadChallenges]);
 
+ const persistGeneratedWorkout = useCallback(async (programmeText: string, nextProgrammeData: ProgrammeData) => {
+ const token = localStorage.getItem('token');
+ if (!token) return null;
+ setSaveStatus('saving');
+ try {
+ const res = await fetch('/api/workouts/save', {
+ method: 'POST',
+ headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+ body: JSON.stringify({
+ title: `${objectifs.join(', ') || 'Programme'} — ${joursSelectes.join(', ') || new Date().toLocaleDateString('fr-FR')}`,
+ rawText: programmeText,
+ programme: nextProgrammeData,
+ config: { objectifs, frequence, joursSelectes, lieu, tempsSeance, dureeProgramme },
+ }),
+ });
+ const data = await res.json().catch(() => ({}));
+ if (!res.ok || !data.workout?.id) {
+ setSaveStatus('error');
+ return null;
+ }
+ setSavedWorkoutId(data.workout.id);
+ setSaveStatus('saved');
+ await loadSavedWorkouts();
+ setActiveWorkout(data.workout);
+ return data.workout.id as string;
+ } catch {
+ setSaveStatus('error');
+ return null;
+ }
+ }, [dureeProgramme, frequence, joursSelectes, lieu, loadSavedWorkouts, objectifs, tempsSeance]);
+
  // Generate avec barre de progression
  const handleGenerate = async () => {
  setGenerating(true);
@@ -1285,8 +1321,10 @@ export default function EntrainementPage() {
  const data = await res.json();
  if (data.programmeData?.jours?.length) {
  const parsed = data.programmeData as ProgrammeData;
+ const nextProgrammeText = JSON.stringify(parsed, null, 2);
  setProgrammeData(parsed);
- setProgramme(JSON.stringify(parsed, null, 2));
+ setProgramme(nextProgrammeText);
+ await persistGeneratedWorkout(nextProgrammeText, parsed);
  setTimeout(() => setGenProgress(100), 200);
  } else {
  setProgramme('Erreur : ' + (data.error || 'Impossible de générer le programme.'));
@@ -1303,27 +1341,8 @@ export default function EntrainementPage() {
 
  // Sauvegarde en BDD
  const handleSave = async () => {
- if (!programme) return;
- setSaveStatus('saving');
- const token = localStorage.getItem('token');
- try {
- const res = await fetch('/api/workouts/save', {
- method: 'POST',
- headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
- body: JSON.stringify({
- title: `${objectifs.join(', ') || 'Programme'} — ${joursSelectes.join(', ') || new Date().toLocaleDateString('fr-FR')}`,
- rawText: programme,
- programme: programmeData ?? { jours: [] },
- config: { objectifs, frequence, joursSelectes, lieu, tempsSeance },
- }),
- });
- const data = await res.json();
- if (res.ok) {
- setSavedWorkoutId(data.workout.id);
- setSaveStatus('saved');
- await loadSavedWorkouts();
- } else { setSaveStatus('error'); }
- } catch { setSaveStatus('error'); }
+ if (!programme || !programmeData) return;
+ await persistGeneratedWorkout(programme, programmeData);
  };
 
  // Démarrer une séance interactive
@@ -1356,7 +1375,15 @@ export default function EntrainementPage() {
  loadUserLevel(); // reload XP
  };
 
- const handleShare = (workoutId?: string) => { setShareOpen(true); setShareTarget(null); setShareSent(false); setShareSearch(''); setShareWorkoutId(workoutId ?? null); };
+ const handleShare = (workoutId?: string) => {
+ setShareOpen(true);
+ setShareTarget(null);
+ setShareSent(false);
+ setShareSending(false);
+ setShareError(null);
+ setShareSearch('');
+ setShareWorkoutId(workoutId ?? null);
+ };
 
  const handleDeleteWorkout = async (workoutId: string) => {
  if (!confirm('Supprimer cette séance ? Cette action est irréversible.')) return;
@@ -1375,6 +1402,12 @@ export default function EntrainementPage() {
  const confirmShare = async () => {
  if (!shareTarget) return;
  const token = localStorage.getItem('token');
+ if (!token) {
+ setShareError('Connexion requise pour partager un programme.');
+ return;
+ }
+ setShareSending(true);
+ setShareError(null);
  try {
  let content: string;
  if (shareWorkoutId) {
@@ -1390,13 +1423,24 @@ export default function EntrainementPage() {
  } else {
  content = ` Je partage mon programme d'entraînement avec toi !`;
  }
- await fetch('/api/messages/send', {
+ const response = await fetch('/api/messages/send', {
  method: 'POST',
  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
  body: JSON.stringify({ receiverId: shareTarget, content }),
  });
- } catch { /* silencieux */ }
+ const data = await response.json().catch(() => ({}));
+ if (!response.ok) {
+ setShareError(typeof data?.error === 'string' ? data.error : 'Impossible de partager ce programme.');
+ setShareSending(false);
+ return;
+ }
+ } catch {
+ setShareError('Erreur reseau pendant le partage.');
+ setShareSending(false);
+ return;
+ }
  setShareSent(true);
+ setShareSending(false);
  setTimeout(() => { setShareOpen(false); setShareSent(false); }, 2000);
  };
  const handleEdit = () => { setEditMode(true); setEditedProgramme(programme || ''); };
@@ -1435,7 +1479,7 @@ export default function EntrainementPage() {
  const [exoLibResults, setExoLibResults] = useState<ExerciseDBItem[]>([]);
  const [exoLibLoading, setExoLibLoading] = useState(false);
  const [exoDetail, setExoDetail] = useState<ExerciseDBItem | null>(null);
- const [exerciseMediaMap, setExerciseMediaMap] = useState<Record<string, { nameFr?: string | null; gifUrl?: string | null; instructionFr?: string | null }>>({});
+ const [exerciseMediaMap, setExerciseMediaMap] = useState<Record<string, { nameFr?: string | null; gifUrl?: string | null; animationFrames?: string[] | null; instructionFr?: string | null }>>({});
  const loadedMediaRef = useRef<Set<string>>(new Set());
 
  const loadExerciseMedia = useCallback(async (exerciseName: string) => {
@@ -1444,17 +1488,15 @@ export default function EntrainementPage() {
  loadedMediaRef.current.add(key);
  try {
  const token = localStorage.getItem('token');
- const res = await fetch(`/api/exercise-media?name=${encodeURIComponent(exerciseName)}`, {
- headers: token ? { Authorization: `Bearer ${token}` } : {},
- });
- const data = await res.json();
- if (data?.media) {
+ const media = await fetchExerciseMedia(exerciseName, token);
+ if (media) {
  setExerciseMediaMap((prev) => ({
  ...prev,
  [key]: {
- nameFr: data.media.name || null,
- gifUrl: data.media.gifUrl || null,
- instructionFr: data.media.instructionFr || null,
+ nameFr: media.name || null,
+ gifUrl: media.gifUrl || null,
+ animationFrames: media.animationFrames || null,
+ instructionFr: media.instructionFr || null,
  },
  }));
  }
@@ -2166,14 +2208,15 @@ export default function EntrainementPage() {
  {ei + 1}
  </span>
  <div className="flex-1 min-w-0">
- {exerciseMediaMap[exo.nom.trim().toLowerCase()]?.gifUrl && (
- <img
- src={exerciseMediaMap[exo.nom.trim().toLowerCase()]?.gifUrl || ''}
- alt={exo.nom}
- className="w-full max-w-[220px] h-32 object-cover rounded-lg border border-gray-200 mb-2"
- loading="lazy"
- />
- )}
+{(exerciseMediaMap[exo.nom.trim().toLowerCase()]?.gifUrl || exerciseMediaMap[exo.nom.trim().toLowerCase()]?.animationFrames?.length) && (
+<ExerciseMotionPreview
+title={exo.nom}
+gifUrl={exerciseMediaMap[exo.nom.trim().toLowerCase()]?.gifUrl}
+frames={exerciseMediaMap[exo.nom.trim().toLowerCase()]?.animationFrames}
+className="mb-2 max-w-[220px] overflow-hidden rounded-lg border border-gray-200"
+imgClassName="w-full h-32 object-contain bg-slate-50"
+/>
+)}
  <p className="text-sm font-semibold text-gray-900 break-words">{exerciseMediaMap[exo.nom.trim().toLowerCase()]?.nameFr || exo.nom}</p>
  <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1">
  <span className="text-xs text-gray-500">{exo.series} séries</span>
@@ -2258,7 +2301,7 @@ export default function EntrainementPage() {
  <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl" onClick={(e) => e.stopPropagation()}>
  <div className="px-6 py-5 border-b border-gray-100">
  <h3 className="text-base font-bold text-gray-900">Partager l&apos;entraînement</h3>
- <p className="text-xs text-gray-400 mt-0.5">Sélectionnez un ami ou recherchez un utilisateur</p>
+ <p className="text-xs text-gray-400 mt-0.5">Sélectionnez un ami pour lui envoyer ce programme</p>
  </div>
  <div className="px-4 pt-3">
  <input
@@ -2294,14 +2337,19 @@ export default function EntrainementPage() {
  </button>
  ))}
  </div>
+ {shareError && (
+ <div className="px-6 pb-2">
+ <p className="text-xs text-red-600">{shareError}</p>
+ </div>
+ )}
  <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
- <button onClick={() => setShareOpen(false)} className="flex-1 px-4 py-2.5 border border-gray-200 text-gray-600 text-sm font-semibold rounded-lg hover:bg-gray-50 transition">Annuler</button>
+ <button onClick={() => { setShareOpen(false); setShareSending(false); setShareError(null); }} className="flex-1 px-4 py-2.5 border border-gray-200 text-gray-600 text-sm font-semibold rounded-lg hover:bg-gray-50 transition">Annuler</button>
  <button
  onClick={confirmShare}
- disabled={!shareTarget || shareSent}
- className={`flex-1 px-4 py-2.5 text-sm font-semibold rounded-lg transition ${shareSent ? 'bg-emerald-500 text-white' : shareTarget ? 'bg-emerald-500 hover:bg-emerald-400 text-white' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
+ disabled={!shareTarget || shareSent || shareSending}
+ className={`flex-1 px-4 py-2.5 text-sm font-semibold rounded-lg transition ${shareSent ? 'bg-emerald-500 text-white' : shareTarget && !shareSending ? 'bg-emerald-500 hover:bg-emerald-400 text-white' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
  >
- {shareSent ? 'Envoyé !' : 'Envoyer'}
+ {shareSent ? 'Envoye !' : shareSending ? 'Envoi...' : 'Envoyer'}
  </button>
  </div>
  </div>
@@ -2360,7 +2408,7 @@ export default function EntrainementPage() {
  <div className="mb-4 sm:mb-5 rounded-2xl border border-gray-200 bg-white overflow-hidden">
  <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] items-stretch">
  <div className="bg-gray-50 border-b sm:border-b-0 sm:border-r border-gray-200">
- <img src={SESSION_META[nextSession.type].image} alt="Seance suivante" className="w-full h-32 sm:h-full object-cover" />
+ <img src={SESSION_META[nextSession.type].image} alt="Seance suivante" className="w-full h-32 sm:h-full object-contain bg-slate-50" />
  </div>
  <div className="p-4 sm:p-5">
  <div className="flex items-center gap-2 mb-1">
@@ -2563,14 +2611,15 @@ export default function EntrainementPage() {
  <span key={e.name} className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium capitalize">{e.name}</span>
  ))}
  </div>
- {exerciseMediaMap[exoDetail.name.trim().toLowerCase()]?.gifUrl && (
- <img
- src={exerciseMediaMap[exoDetail.name.trim().toLowerCase()]?.gifUrl || ''}
- alt={exoDetail.name}
- className="w-full max-w-md h-52 object-cover rounded-lg border border-gray-200 mb-3"
- loading="lazy"
- />
- )}
+{(exerciseMediaMap[exoDetail.name.trim().toLowerCase()]?.gifUrl || exerciseMediaMap[exoDetail.name.trim().toLowerCase()]?.animationFrames?.length) && (
+<ExerciseMotionPreview
+title={exoDetail.name}
+gifUrl={exerciseMediaMap[exoDetail.name.trim().toLowerCase()]?.gifUrl}
+frames={exerciseMediaMap[exoDetail.name.trim().toLowerCase()]?.animationFrames}
+className="mb-3 max-w-md overflow-hidden rounded-lg border border-gray-200"
+imgClassName="w-full h-52 object-contain bg-slate-50"
+/>
+)}
  {exoDetail.description && (
  <p className="text-xs text-gray-600 leading-relaxed"
  dangerouslySetInnerHTML={{ __html: exoDetail.description.replace(/<[^>]+>/g, '').slice(0, 300) + (exoDetail.description.length > 300 ? '...' : '') }}
@@ -2592,14 +2641,15 @@ export default function EntrainementPage() {
  exoDetail?.id === ex.id ? 'border-emerald-500 bg-emerald-50' : 'border-gray-200 hover:border-emerald-400 bg-white'
  }`}
  >
- {exerciseMediaMap[ex.name.trim().toLowerCase()]?.gifUrl && (
- <img
- src={exerciseMediaMap[ex.name.trim().toLowerCase()]?.gifUrl || ''}
- alt={ex.name}
- className="w-full h-28 object-cover rounded-lg border border-gray-200 mb-2"
- loading="lazy"
- />
- )}
+{(exerciseMediaMap[ex.name.trim().toLowerCase()]?.gifUrl || exerciseMediaMap[ex.name.trim().toLowerCase()]?.animationFrames?.length) && (
+<ExerciseMotionPreview
+title={ex.name}
+gifUrl={exerciseMediaMap[ex.name.trim().toLowerCase()]?.gifUrl}
+frames={exerciseMediaMap[ex.name.trim().toLowerCase()]?.animationFrames}
+className="mb-2 overflow-hidden rounded-lg border border-gray-200"
+imgClassName="w-full h-28 object-contain bg-slate-50"
+/>
+)}
  <p className="text-sm font-semibold text-gray-900 capitalize leading-snug mb-1">{exerciseMediaMap[ex.name.trim().toLowerCase()]?.nameFr || ex.name}</p>
  <div className="flex gap-1.5 flex-wrap">
  {ex.category?.name && (

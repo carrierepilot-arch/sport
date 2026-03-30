@@ -19,15 +19,15 @@ export default function Home() {
  {/* HERO */}
  <main className="flex-1 px-5 sm:px-8 pb-14 pt-8 md:pt-12 max-w-6xl mx-auto w-full">
  <section className="ios-card p-6 sm:p-8 md:p-10 mb-6 sm:mb-8">
- <p className="text-xs sm:text-sm font-semibold uppercase tracking-[0.16em] text-sky-700">Application sport</p>
+ <p className="text-xs sm:text-sm font-semibold uppercase tracking-[0.16em] text-sky-700">Reseau social street workout</p>
  <h1 className="mt-3 text-4xl sm:text-5xl md:text-6xl font-black tracking-tight leading-[0.95]">
- Un espace clair pour
+ L app pour performer,
  <span className="block text-transparent bg-clip-text bg-gradient-to-r from-sky-500 to-teal-500">
- progresser chaque semaine
+ publier, et grimper au classement
  </span>
  </h1>
  <p className="max-w-2xl text-base sm:text-lg text-gray-600 mt-4 leading-relaxed">
- SPORT regroupe vos seances, vos performances et votre reseau dans une interface simple a prendre en main sur mobile.
+ SPORT combine fil social, spots geolocalises, suivi de performance et leaderboards competitifs par ville et par spot.
  </p>
  <div className="flex flex-col sm:flex-row gap-3 mt-7">
  <Link
@@ -42,14 +42,20 @@ export default function Home() {
  >
  J'ai deja un compte
  </Link>
+ <Link
+ href="/dashboard/social"
+ className="px-7 py-3.5 border border-sky-300 hover:bg-sky-50 text-sky-800 font-bold rounded-full transition text-center"
+ >
+ Ouvrir le hub social
+ </Link>
  </div>
  </section>
 
  <section className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5 mb-6 sm:mb-8">
  {[
- { title: "1. Organiser", desc: "Preparez vos seances sans vous perdre dans des menus complexes.", note: "Entrainement" },
- { title: "2. Suivre", desc: "Consultez vos statistiques avec une lecture rapide des progres.", note: "Analyse" },
- { title: "3. Echanger", desc: "Restez connecte a votre reseau et a vos objectifs communs.", note: "Reseau" },
+ { title: "Reseau social", desc: "Publiez vos performances, videos et records avec likes, commentaires et defis.", note: "A" },
+ { title: "Carte des spots", desc: "Reperez bars, parcs et salles. Classements par spot pour une vraie scene locale.", note: "B" },
+ { title: "Suivi & classements", desc: "Trackez vos perfs, detectez vos PR et montez dans les ligues Bronze a Legende.", note: "C + D" },
  ].map((f) => (
  <article key={f.title} className="ios-card p-5 sm:p-6">
  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">{f.note}</p>
@@ -60,13 +66,24 @@ export default function Home() {
  </section>
 
  <section className="ios-card p-5 sm:p-6">
- <h2 className="text-lg sm:text-xl font-bold text-gray-900">Pourquoi l'interface est plus simple</h2>
+ <h2 className="text-lg sm:text-xl font-bold text-gray-900">Fonctionnalites deja integrees</h2>
  <ul className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-gray-700">
- <li className="rounded-xl border border-gray-200 bg-white px-4 py-3">Navigation principale raccourcie avec un accueil central.</li>
- <li className="rounded-xl border border-gray-200 bg-white px-4 py-3">Actions importantes visibles en premier, sans surcharge.</li>
- <li className="rounded-xl border border-gray-200 bg-white px-4 py-3">Taille des boutons optimisee pour le mobile.</li>
- <li className="rounded-xl border border-gray-200 bg-white px-4 py-3">Lecture rapide grace a des sections plus nettes.</li>
+ <li className="rounded-xl border border-gray-200 bg-white px-4 py-3">Actualites, messages et amis relies dans une meme rubrique sociale.</li>
+ <li className="rounded-xl border border-gray-200 bg-white px-4 py-3">Performances, preuves video 480p, progression et validation communautaire.</li>
+ <li className="rounded-xl border border-gray-200 bg-white px-4 py-3">Ligues Elo, equipes, classements par exercice et competitions locales.</li>
+ <li className="rounded-xl border border-gray-200 bg-white px-4 py-3">Profils publics avec badge verifie, badges de progression et suivi hebdomadaire.</li>
  </ul>
+ </section>
+
+ <section className="ios-card p-5 sm:p-6 mt-6">
+ <h2 className="text-lg sm:text-xl font-bold text-gray-900">Ligues de niveau</h2>
+ <div className="mt-4 grid grid-cols-2 sm:grid-cols-5 gap-2 text-sm font-semibold">
+ <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-amber-800 text-center">Bronze</div>
+ <div className="rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-slate-700 text-center">Argent</div>
+ <div className="rounded-xl border border-yellow-200 bg-yellow-50 px-3 py-2 text-yellow-800 text-center">Or</div>
+ <div className="rounded-xl border border-cyan-200 bg-cyan-50 px-3 py-2 text-cyan-800 text-center">Diamant</div>
+ <div className="rounded-xl border border-purple-200 bg-purple-50 px-3 py-2 text-purple-800 text-center">Legende</div>
+ </div>
  </section>
  </main>
 

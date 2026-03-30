@@ -1,8 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/auth';
+import { getProfileImageUrl } from '@/lib/social';
 
-const VALID_EXERCISES = ['tractions', 'pompes', 'dips', 'squats', 'tractions_lestees', 'dips_lestes'];
+const VALID_EXERCISES = ['tractions', 'pompes', 'dips', 'squats', 'tractions_lestees', 'dips_lestes', 'muscle_ups'];
+
+function computeElo(rank: number, total: number): number {
+ if (total <= 1) return 1200;
+ const ratio = (total - rank) / (total - 1);
+ return Math.round(900 + ratio * 1200);
+}
+
+function getLeague(elo: number): string {
+ if (elo >= 1900) return 'Legende';
+ if (elo >= 1700) return 'Diamant';
+ if (elo >= 1450) return 'Or';
+ if (elo >= 1200) return 'Argent';
+ return 'Bronze';
+}
 
 export async function GET(request: NextRequest) {
  try {
@@ -33,12 +48,12 @@ export async function GET(request: NextRequest) {
  });
 
  const userIds = Array.from(new Set(rows.map((r) => r.userId)));
- const spotIds = Array.from(new Set(rows.map((r) => r.spotId)));
+ const spotIds = Array.from(new Set(rows.map((r) => r.spotId).filter((id): id is string => id !== null)));
 
  const [users, spots] = await Promise.all([
  prisma.user.findMany({
  where: { id: { in: userIds } },
- select: { id: true, pseudo: true, name: true },
+ select: { id: true, pseudo: true, name: true, equipmentData: true },
  }),
  prisma.spot.findMany({
  where: { id: { in: spotIds } },
@@ -65,12 +80,15 @@ export async function GET(request: NextRequest) {
  const myIndex = deduped.findIndex(r => r.userId === payload.userId);
  const myEntry = myIndex >= 0 ? {
  rank: myIndex + 1,
+ elo: computeElo(myIndex + 1, deduped.length),
+ league: getLeague(computeElo(myIndex + 1, deduped.length)),
  userId: deduped[myIndex].userId,
  pseudo: userById.get(deduped[myIndex].userId)?.pseudo ?? userById.get(deduped[myIndex].userId)?.name ?? 'Anonyme',
+ profileImageUrl: getProfileImageUrl(userById.get(deduped[myIndex].userId)?.equipmentData),
  score: deduped[myIndex].score,
  unit: deduped[myIndex].unit,
- spotName: spotById.get(deduped[myIndex].spotId)?.name ?? 'Spot inconnu',
- spotCity: spotById.get(deduped[myIndex].spotId)?.city ?? null,
+ spotName: deduped[myIndex].spotId ? (spotById.get(deduped[myIndex].spotId!)?.name ?? 'Spot inconnu') : 'Sans lieu',
+ spotCity: deduped[myIndex].spotId ? (spotById.get(deduped[myIndex].spotId!)?.city ?? null) : null,
  performanceId: deduped[myIndex].id,
  } : null;
 
@@ -79,12 +97,15 @@ export async function GET(request: NextRequest) {
  total: deduped.length,
  leaderboard: leaderboard.map((r, i) => ({
  rank: i + 1,
+ elo: computeElo(i + 1, deduped.length),
+ league: getLeague(computeElo(i + 1, deduped.length)),
  userId: r.userId,
  pseudo: userById.get(r.userId)?.pseudo ?? userById.get(r.userId)?.name ?? 'Anonyme',
+ profileImageUrl: getProfileImageUrl(userById.get(r.userId)?.equipmentData),
  score: r.score,
  unit: r.unit,
- spotName: spotById.get(r.spotId)?.name ?? 'Spot inconnu',
- spotCity: spotById.get(r.spotId)?.city ?? null,
+ spotName: r.spotId ? (spotById.get(r.spotId)?.name ?? 'Spot inconnu') : 'Sans lieu',
+ spotCity: r.spotId ? (spotById.get(r.spotId)?.city ?? null) : null,
  performanceId: r.id,
  })),
  myEntry,

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import Link from 'next/link';
 
 /* ─── Types ─────────────────────────────────────────────────────────────── */
 interface SpotData {
@@ -32,6 +33,7 @@ const EXERCISES = [
   { key: 'pompes', label: 'Pompes', unit: 'reps' },
   { key: 'dips', label: 'Dips', unit: 'reps' },
   { key: 'squats', label: 'Squats', unit: 'reps' },
+  { key: 'muscle_ups', label: 'Muscle-ups', unit: 'reps' },
   { key: 'tractions_lestees', label: 'Tractions +lest', unit: 'kg' },
   { key: 'dips_lestes', label: 'Dips +lest', unit: 'kg' },
 ];
@@ -344,7 +346,7 @@ export default function CartePage() {
       </div>
 
       {/* ── Floating top bar ── */}
-      <div className="absolute top-0 inset-x-0 z-[900] px-3 pt-3 pointer-events-none">
+      <div className="absolute top-0 inset-x-0 z-[1200] px-3 pt-3 pointer-events-none">
         <div className="flex gap-2 pointer-events-auto">
           {/* Search */}
           <div className="relative flex-1">
@@ -501,7 +503,7 @@ export default function CartePage() {
                       {(e.pseudo || '?')[0].toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-900 truncate">{e.pseudo}</p>
+                      <Link href={`/dashboard/profil/${e.userId}`} className="text-sm font-semibold text-gray-900 truncate hover:underline block">{e.pseudo}</Link>
                       <p className="text-[11px] text-gray-400 truncate">{e.spotName}, {e.spotCity}</p>
                     </div>
                     <span className="text-sm font-black text-gray-900 flex-shrink-0">{e.score} <span className="text-xs font-normal text-gray-400">{e.unit}</span></span>
@@ -598,7 +600,7 @@ export default function CartePage() {
                         <div className="w-6 h-6 rounded-full bg-gradient-to-br from-indigo-400 to-indigo-600 flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0">
                           {(r.pseudo || r.name || '?')[0].toUpperCase()}
                         </div>
-                        <span className="text-xs font-medium text-gray-800">{r.pseudo || r.name || 'Anonyme'}</span>
+                        <Link href={`/dashboard/profil/${r.userId}`} className="text-xs font-medium text-gray-800 hover:underline">{r.pseudo || r.name || 'Anonyme'}</Link>
                         {r.isMe ? (
                           <span className="text-[10px] text-emerald-500 font-bold">Toi</span>
                         ) : r.isFriend ? (
@@ -652,7 +654,7 @@ export default function CartePage() {
                           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-400 to-indigo-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
                             {(e.pseudo || e.name || '?')[0].toUpperCase()}
                           </div>
-                          <span className="flex-1 text-sm font-semibold text-gray-800 truncate">{e.pseudo || e.name || 'Anonyme'}</span>
+                          <Link href={`/dashboard/profil/${e.userId}`} className="flex-1 text-sm font-semibold text-gray-800 truncate hover:underline">{e.pseudo || e.name || 'Anonyme'}</Link>
                           <span className="text-sm font-black text-gray-900 flex-shrink-0">{e.score} <span className="text-xs font-normal text-gray-400">{e.unit}</span></span>
                           {e.status === 'validated' && <span className="text-emerald-500 text-xs flex-shrink-0">✓</span>}
                         </div>

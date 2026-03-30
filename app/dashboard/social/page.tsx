@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { UserAvatar } from '@/components/UserAvatar';
 
-type Tab = 'feed' | 'boite' | 'amis' | 'jeux' | 'defis' | 'performances';
+type Tab = 'feed' | 'boite' | 'performances';
 
 type FeedReply = {
   id: string;
@@ -12,6 +13,7 @@ type FeedReply = {
   author: {
     id: string;
     pseudo: string;
+    profileImageUrl?: string | null;
   };
 };
 
@@ -22,20 +24,72 @@ type FeedPost = {
   author: {
     id: string;
     pseudo: string;
+    profileImageUrl?: string | null;
   };
   likeCount: number;
   likedByMe: boolean;
   replyCount: number;
   replies: FeedReply[];
+  feedScore?: number;
+  rankingReasons?: string[];
 };
 
-type Conversation = { friendId: string; pseudo: string; nom: string; dernier: string; heure: string; nonLu: number };
+type SocialProfileCard = {
+  id: string;
+  pseudo: string;
+  name: string | null;
+  level: string;
+  xp: number;
+  verified: boolean;
+  followedByMe: boolean;
+  profileVisibility?: 'public' | 'private';
+  isPrivate?: boolean;
+  profileImageUrl?: string | null;
+  counts: {
+    followers: number;
+    following: number;
+    posts: number;
+    validatedPerformances: number;
+    weeklySessions: number;
+  };
+  bestPerformance: { exercise: string; score: number; unit: string } | null;
+};
+
+type CommunityPerformance = {
+  id: string;
+  exercise: string;
+  score: number;
+  unit: string;
+  status: string;
+  videoUrl: string | null;
+  createdAt: string;
+  validationQuestion: string;
+  canVote: boolean;
+  validation: {
+    accepted: number;
+    rejected: number;
+    total: number;
+    myVote: string | null;
+  };
+  author: {
+    id: string;
+    pseudo: string;
+    level: string;
+    xp: number;
+    profileImageUrl?: string | null;
+    verified: boolean;
+  };
+  spot: { id: string; name: string; city: string | null };
+};
+
+type Conversation = { friendId: string; pseudo: string; nom: string; dernier: string; heure: string; nonLu: number; profileImageUrl?: string | null };
 type ChatMessage = { id: string; from: 'me' | 'them'; text: string; heure: string };
 type AmiItem = {
   id: string;
   friendId: string;
   pseudo: string;
   nom: string;
+  profileImageUrl?: string | null;
   statut: 'accepte' | 'accepted' | 'en_attente' | 'pending' | 'recu';
 };
 
@@ -75,11 +129,256 @@ function formatRelativeDate(input: string): string {
   return date.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
 }
 
-function Avatar({ letter, size = 'sm' }: { letter: string; size?: 'xs' | 'sm' | 'md' }) {
-  const palette = ['bg-rose-500', 'bg-orange-500', 'bg-amber-500', 'bg-emerald-500', 'bg-teal-500', 'bg-sky-500', 'bg-blue-500', 'bg-violet-500'];
-  const bg = palette[letter.toUpperCase().charCodeAt(0) % palette.length];
-  const sizeClass = size === 'xs' ? 'w-6 h-6 text-xs' : size === 'sm' ? 'w-8 h-8 text-sm' : 'w-10 h-10 text-base';
-  return <div className={`${bg} ${sizeClass} rounded-full flex items-center justify-center text-white font-semibold flex-shrink-0`}>{letter.toUpperCase()}</div>;
+const FEED_MAX_VIDEO_SIZE = 8 * 1024 * 1024;
+const FEED_MAX_VIDEO_DURATION = 10;
+const FEED_ALLOWED_VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/quicktime'];
+
+// ── Performance video pipeline ──────────────────────────────────────────────
+const PERF_MAX_VIDEO_SIZE = 200 * 1024 * 1024; // 200 MB
+const PERF_ALLOWED_VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/quicktime'];
+const PERF_EXERCISES = [
+  { key: 'tractions', label: 'Tractions', unit: 'reps' },
+  { key: 'pompes', label: 'Pompes', unit: 'reps' },
+  { key: 'dips', label: 'Dips', unit: 'reps' },
+  { key: 'squats', label: 'Squats', unit: 'reps' },
+  { key: 'muscle_ups', label: 'Muscle-ups', unit: 'reps' },
+  { key: 'tractions_lestees', label: 'Tractions lestées', unit: 'kg' },
+  { key: 'dips_lestes', label: 'Dips lestés', unit: 'kg' },
+] as const;
+
+function isZipVideoUrl(url: string | null | undefined): boolean {
+  return !!url && /\.zip($|\?)/i.test(url);
+}
+
+async function compressPerfVideo(file: File, onProgress: (pct: number) => void): Promise<File> {
+  if (typeof MediaRecorder === 'undefined' || typeof HTMLVideoElement === 'undefined') return file;
+  const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')
+    ? 'video/webm;codecs=vp8,opus'
+    : MediaRecorder.isTypeSupported('video/webm')
+      ? 'video/webm'
+      : null;
+  if (!mimeType) return file;
+  return new Promise((resolve) => {
+    const video = document.createElement('video');
+    video.muted = true;
+    video.playsInline = true;
+    video.style.display = 'none';
+    document.body.appendChild(video);
+    const objectUrl = URL.createObjectURL(file);
+    video.src = objectUrl;
+    video.onloadedmetadata = () => {
+      const MAX_H = 480;
+      const scale = video.videoHeight > MAX_H ? MAX_H / video.videoHeight : 1;
+      const w = Math.round(video.videoWidth * scale);
+      const h = Math.round(video.videoHeight * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d')!;
+      const stream = canvas.captureStream(24);
+      const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 800_000 });
+      const chunks: Blob[] = [];
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+      const duration = video.duration || 0;
+      recorder.onstop = () => {
+        URL.revokeObjectURL(objectUrl);
+        document.body.removeChild(video);
+        const blob = new Blob(chunks, { type: mimeType.split(';')[0] });
+        const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
+        resolve(new File([blob], file.name.replace(/\.[^.]+$/, `.${ext}`), { type: mimeType.split(';')[0] }));
+      };
+      const drawFrame = () => {
+        if (video.paused || video.ended) { recorder.stop(); return; }
+        ctx.drawImage(video, 0, 0, w, h);
+        if (duration > 0) onProgress(Math.round((video.currentTime / duration) * 90));
+        requestAnimationFrame(drawFrame);
+      };
+      recorder.start();
+      video.play().then(() => requestAnimationFrame(drawFrame)).catch(() => {
+        recorder.stop();
+        URL.revokeObjectURL(objectUrl);
+        document.body.removeChild(video);
+        resolve(file);
+      });
+    };
+    video.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      document.body.removeChild(video);
+      resolve(file);
+    };
+  });
+}
+
+async function zipVideoFile(file: File, onProgress: (pct: number) => void): Promise<File> {
+  const JSZip = (await import('jszip')).default;
+  const zip = new JSZip();
+  zip.file(file.name, file);
+  onProgress(95);
+  const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 1 } });
+  onProgress(100);
+  return new File([blob], file.name.replace(/\.[^.]+$/, '.zip'), { type: 'application/zip' });
+}
+
+async function readVideoMetadata(file: File): Promise<{ duration: number; width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement('video');
+    const objectUrl = URL.createObjectURL(file);
+    video.preload = 'metadata';
+    video.onloadedmetadata = () => {
+      resolve({ duration: video.duration || 0, width: video.videoWidth || 0, height: video.videoHeight || 0 });
+      URL.revokeObjectURL(objectUrl);
+    };
+    video.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('Impossible de lire la video.'));
+    };
+    video.src = objectUrl;
+  });
+}
+
+async function compressFeedVideo(file: File, onProgress: (pct: number) => void): Promise<File> {
+  const metadata = await readVideoMetadata(file);
+  const needsCompression = file.size > FEED_MAX_VIDEO_SIZE || metadata.height > 480;
+  if (!needsCompression) return file;
+
+  if (typeof MediaRecorder === 'undefined' || typeof HTMLVideoElement === 'undefined') {
+    return file;
+  }
+
+  const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')
+    ? 'video/webm;codecs=vp8,opus'
+    : MediaRecorder.isTypeSupported('video/webm')
+      ? 'video/webm'
+      : null;
+
+  if (!mimeType) return file;
+
+  return new Promise((resolve) => {
+    const video = document.createElement('video');
+    video.muted = true;
+    video.playsInline = true;
+    video.style.display = 'none';
+    document.body.appendChild(video);
+
+    const objectUrl = URL.createObjectURL(file);
+    video.src = objectUrl;
+
+    video.onloadedmetadata = () => {
+      const maxHeight = 480;
+      const scale = video.videoHeight > maxHeight ? maxHeight / video.videoHeight : 1;
+      const width = Math.max(2, Math.round((video.videoWidth * scale) / 2) * 2);
+      const height = Math.max(2, Math.round((video.videoHeight * scale) / 2) * 2);
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        URL.revokeObjectURL(objectUrl);
+        document.body.removeChild(video);
+        resolve(file);
+        return;
+      }
+
+      const stream = canvas.captureStream(24);
+      const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 700_000 });
+      const chunks: Blob[] = [];
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) chunks.push(event.data);
+      };
+
+      recorder.onstop = () => {
+        URL.revokeObjectURL(objectUrl);
+        document.body.removeChild(video);
+        const blob = new Blob(chunks, { type: mimeType.split(';')[0] });
+        resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.webm'), { type: mimeType.split(';')[0] }));
+      };
+
+      const maxDuration = Math.min(video.duration || FEED_MAX_VIDEO_DURATION, FEED_MAX_VIDEO_DURATION);
+      const drawFrame = () => {
+        if (video.paused || video.ended || video.currentTime >= maxDuration) {
+          recorder.stop();
+          return;
+        }
+        ctx.drawImage(video, 0, 0, width, height);
+        if (maxDuration > 0) onProgress(Math.min(100, Math.round((video.currentTime / maxDuration) * 100)));
+        requestAnimationFrame(drawFrame);
+      };
+
+      recorder.start();
+      video.play().then(() => requestAnimationFrame(drawFrame)).catch(() => {
+        recorder.stop();
+        URL.revokeObjectURL(objectUrl);
+        document.body.removeChild(video);
+        resolve(file);
+      });
+    };
+
+    video.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      document.body.removeChild(video);
+      resolve(file);
+    };
+  });
+}
+
+function parseFeedContent(content: string): { kind: 'text' | 'image' | 'video'; mediaUrl: string | null; text: string } {
+  if (content.startsWith('__IMAGE__') || content.startsWith('__VIDEO__')) {
+    const separatorIndex = content.indexOf('\n');
+    const markerLength = content.startsWith('__IMAGE__') ? 9 : 9;
+    const mediaUrl = separatorIndex >= 0 ? content.slice(markerLength, separatorIndex).trim() : content.slice(markerLength).trim();
+    const text = separatorIndex >= 0 ? content.slice(separatorIndex + 1) : '';
+    return {
+      kind: content.startsWith('__VIDEO__') ? 'video' : 'image',
+      mediaUrl: mediaUrl || null,
+      text,
+    };
+  }
+  return { kind: 'text', mediaUrl: null, text: content };
+}
+
+// ── Zip-aware video player ───────────────────────────────────────────────────
+function ZipVideoPlayer({ url, className }: { url: string; className?: string }) {
+  const [src, setSrc] = useState<string | null>(null);
+  const [extracting, setExtracting] = useState(false);
+  const objectUrlRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!isZipVideoUrl(url)) {
+      setSrc(url);
+      return;
+    }
+    setExtracting(true);
+    void import('jszip').then(({ default: JSZip }) =>
+      fetch(url)
+        .then((r) => r.arrayBuffer())
+        .then((buf) => JSZip.loadAsync(buf))
+        .then((zip) => {
+          const entry = Object.values(zip.files).find((f) => !f.dir && /\.(mp4|webm|mov)$/i.test(f.name));
+          return entry ? entry.async('blob') : null;
+        })
+        .then((blob) => {
+          if (blob) {
+            const objUrl = URL.createObjectURL(blob);
+            objectUrlRef.current = objUrl;
+            setSrc(objUrl);
+          } else {
+            setSrc(url);
+          }
+        })
+        .catch(() => setSrc(url)),
+    ).finally(() => setExtracting(false));
+    return () => {
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+        objectUrlRef.current = null;
+      }
+    };
+  }, [url]);
+
+  if (extracting) return <div className="mt-3 rounded-xl bg-slate-50 border border-gray-200 py-4 text-center text-xs text-gray-500">Decompression de la video...</div>;
+  if (!src) return null;
+  return <video controls preload="metadata" className={className} src={src} />;
 }
 
 export default function SocialPage() {
@@ -91,7 +390,10 @@ export default function SocialPage() {
   const [composerError, setComposerError] = useState('');
   const [feedLoading, setFeedLoading] = useState(false);
   const [composerImageUrl, setComposerImageUrl] = useState<string | null>(null);
+  const [composerVideoUrl, setComposerVideoUrl] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
+  const [videoProgress, setVideoProgress] = useState<number | null>(null);
 
   // Boîte state
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -108,6 +410,11 @@ export default function SocialPage() {
   // Amis state
   const [amis, setAmis] = useState<AmiItem[]>([]);
   const [amiseLoading, setAmiseLoading] = useState(false);
+  const [publicProfiles, setPublicProfiles] = useState<SocialProfileCard[]>([]);
+  const [profilesLoading, setProfilesLoading] = useState(false);
+  const [communityPerformances, setCommunityPerformances] = useState<CommunityPerformance[]>([]);
+  const [communityLoading, setCommunityLoading] = useState(false);
+  const [followLoading, setFollowLoading] = useState<string | null>(null);
 
   // Défis state
   const [challenges, setChallenges] = useState<Challenge[]>([]);
@@ -128,6 +435,16 @@ export default function SocialPage() {
   const [challengeActionLoading, setChallengeActionLoading] = useState<Set<string>>(new Set());
   const [challengeNotif, setChallengeNotif] = useState<Record<string, string>>({});
   const challengeLoadingRef = useRef(false);
+
+  // Performance modal state
+  const [showPerfModal, setShowPerfModal] = useState(false);
+  const [perfModalExercise, setPerfModalExercise] = useState<string>('tractions');
+  const [perfModalScore, setPerfModalScore] = useState('');
+  const [perfModalVisibility, setPerfModalVisibility] = useState<'public' | 'private'>('private');
+  const [perfModalVideoFile, setPerfModalVideoFile] = useState<File | null>(null);
+  const [perfModalSubmitting, setPerfModalSubmitting] = useState(false);
+  const [perfModalVideoProgress, setPerfModalVideoProgress] = useState<number | null>(null);
+  const [perfModalError, setPerfModalError] = useState('');
 
   const acceptedAmis = useMemo(
     () => amis.filter((a) => a.statut === 'accepte' || a.statut === 'accepted'),
@@ -196,28 +513,86 @@ export default function SocialPage() {
     setAmiseLoading(false);
   }, []);
 
+  const loadPublicProfiles = useCallback(async () => {
+    setProfilesLoading(true);
+    try {
+      const res = await fetch('/api/social/users', { headers: authHeader() });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) setPublicProfiles(Array.isArray(data.users) ? data.users : []);
+    } catch {
+      // silent
+    }
+    setProfilesLoading(false);
+  }, []);
+
+  const loadCommunityPerformances = useCallback(async () => {
+    setCommunityLoading(true);
+    try {
+      const res = await fetch('/api/performances/community?status=pending', { headers: authHeader() });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) setCommunityPerformances(Array.isArray(data.performances) ? data.performances : []);
+    } catch {
+      // silent
+    }
+    setCommunityLoading(false);
+  }, []);
+
+  const toggleFollow = async (profile: SocialProfileCard) => {
+    if (followLoading) return;
+    setFollowLoading(profile.id);
+    setPublicProfiles((prev) => prev.map((item) => item.id === profile.id ? {
+      ...item,
+      followedByMe: !item.followedByMe,
+      counts: { ...item.counts, followers: item.counts.followers + (item.followedByMe ? -1 : 1) },
+    } : item));
+    try {
+      await fetch('/api/social/follow', {
+        method: profile.followedByMe ? 'DELETE' : 'POST',
+        headers: authHeader(),
+        body: JSON.stringify({ targetUserId: profile.id }),
+      });
+    } catch {
+      setPublicProfiles((prev) => prev.map((item) => item.id === profile.id ? {
+        ...item,
+        followedByMe: profile.followedByMe,
+        counts: { ...item.counts, followers: profile.counts.followers },
+      } : item));
+    }
+    setFollowLoading(null);
+  };
+
+  const votePerformance = async (performanceId: string, isValid: boolean) => {
+    try {
+      const res = await fetch('/api/performances/validate', {
+        method: 'POST',
+        headers: authHeader(),
+        body: JSON.stringify({ action: 'respond', performanceId, isValid }),
+      });
+      if (!res.ok) return;
+      await loadCommunityPerformances();
+    } catch {
+      // silent
+    }
+  };
+
   useEffect(() => {
     void loadFeed();
     void loadConversations();
     void loadAmis();
-  }, [loadFeed, loadConversations, loadAmis]);
-
-  useEffect(() => {
-    if (activeTab !== 'feed') return;
-    const interval = setInterval(() => {
-      void loadFeed();
-    }, 8000);
-    return () => clearInterval(interval);
-  }, [activeTab, loadFeed]);
+    void loadPublicProfiles();
+    void loadCommunityPerformances();
+  }, [loadFeed, loadConversations, loadAmis, loadPublicProfiles, loadCommunityPerformances]);
 
   const publishPost = async () => {
-    if ((!composer.trim() && !composerImageUrl) || posting) return;
+    if ((!composer.trim() && !composerImageUrl && !composerVideoUrl) || posting) return;
     setComposerError('');
     setPosting(true);
     try {
-      const postContent = composerImageUrl
-        ? `__IMAGE__${composerImageUrl}\n${composer.trim()}`
-        : composer.trim();
+      const postContent = composerVideoUrl
+        ? `__VIDEO__${composerVideoUrl}\n${composer.trim()}`
+        : composerImageUrl
+          ? `__IMAGE__${composerImageUrl}\n${composer.trim()}`
+          : composer.trim();
       const res = await fetch('/api/feed', {
         method: 'POST',
         headers: authHeader(),
@@ -228,6 +603,8 @@ export default function SocialPage() {
         setPosts((prev) => [data.post as FeedPost, ...prev]);
         setComposer('');
         setComposerImageUrl(null);
+        setComposerVideoUrl(null);
+        setVideoProgress(null);
         await loadFeed();
       } else if (res.ok) {
         setComposerError('Publication en attente de synchronisation.');
@@ -257,9 +634,58 @@ export default function SocialPage() {
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.imageUrl) {
         setComposerImageUrl(data.imageUrl);
+        setComposerVideoUrl(null);
       }
     } catch { /* silent */ }
     setUploadingImage(false);
+    e.target.value = '';
+  };
+
+  const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setComposerError('');
+
+    if (!FEED_ALLOWED_VIDEO_TYPES.includes(file.type)) {
+      setComposerError('Format video non supporte. Utilise mp4, webm ou mov.');
+      e.target.value = '';
+      return;
+    }
+
+    try {
+      const metadata = await readVideoMetadata(file);
+      if (metadata.duration > FEED_MAX_VIDEO_DURATION) {
+        setComposerError('La video doit durer 10 secondes maximum.');
+        e.target.value = '';
+        return;
+      }
+
+      setUploadingVideo(true);
+      setVideoProgress(0);
+      const preparedFile = await compressFeedVideo(file, setVideoProgress);
+      const formData = new FormData();
+      formData.append('video', preparedFile);
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+      const res = await fetch('/api/feed/upload-video', {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.videoUrl) {
+        setComposerVideoUrl(data.videoUrl);
+        setComposerImageUrl(null);
+        setVideoProgress(100);
+      } else {
+        setComposerError(typeof data.error === 'string' ? data.error : 'Upload video impossible.');
+        setVideoProgress(null);
+      }
+    } catch {
+      setComposerError('Erreur pendant la preparation de la video.');
+      setVideoProgress(null);
+    }
+
+    setUploadingVideo(false);
     e.target.value = '';
   };
 
@@ -371,12 +797,75 @@ export default function SocialPage() {
     setSendingMsg(false);
   };
 
-  const openPerformanceHub = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('reseau_tab', 'performances');
-      window.location.assign('/dashboard/reseau');
+  const closePerfModal = useCallback(() => {
+    setShowPerfModal(false);
+    setPerfModalExercise('tractions');
+    setPerfModalScore('');
+    setPerfModalVisibility('private');
+    setPerfModalVideoFile(null);
+    setPerfModalSubmitting(false);
+    setPerfModalVideoProgress(null);
+    setPerfModalError('');
+  }, []);
+
+  const submitPerfModal = useCallback(async () => {
+    if (!perfModalScore || perfModalSubmitting) return;
+    const scoreNum = parseFloat(perfModalScore);
+    if (isNaN(scoreNum) || scoreNum <= 0) {
+      setPerfModalError('Le score doit être un nombre positif.');
+      return;
     }
-  };
+    setPerfModalError('');
+    setPerfModalSubmitting(true);
+    setPerfModalVideoProgress(null);
+    try {
+      // 1. Create performance record (no spot required)
+      const res = await fetch('/api/performances', {
+        method: 'POST',
+        headers: authHeader(),
+        body: JSON.stringify({ exercise: perfModalExercise, score: scoreNum, visibility: perfModalVisibility }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setPerfModalError(typeof data?.error === 'string' ? data.error : 'Erreur lors de l\'ajout.');
+        setPerfModalSubmitting(false);
+        return;
+      }
+      const performanceId = (data.performance as { id?: string } | undefined)?.id;
+
+      // 2. If video selected: compress 480p → zip → upload
+      if (perfModalVideoFile && performanceId) {
+        setPerfModalVideoProgress(0);
+        try {
+          const compressed = await compressPerfVideo(perfModalVideoFile, (pct) =>
+            setPerfModalVideoProgress(Math.round(pct * 0.9)),
+          );
+          const zipped = await zipVideoFile(compressed, (pct) => setPerfModalVideoProgress(pct));
+          const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+          const { upload } = await import('@vercel/blob/client');
+          await upload(
+            `performances/${performanceId}/${Date.now()}-${zipped.name}`,
+            zipped,
+            {
+              access: 'public',
+              handleUploadUrl: '/api/performances/upload-video/client',
+              clientPayload: performanceId,
+              headers: token ? { Authorization: `Bearer ${token}` } : {},
+            },
+          );
+        } catch {
+          // Video upload failed but performance record is saved — continue silently
+        }
+        setPerfModalVideoProgress(null);
+      }
+
+      await loadCommunityPerformances();
+      closePerfModal();
+    } catch {
+      setPerfModalError('Erreur réseau. Veuillez réessayer.');
+      setPerfModalSubmitting(false);
+    }
+  }, [perfModalScore, perfModalSubmitting, perfModalExercise, perfModalVisibility, perfModalVideoFile, loadCommunityPerformances, closePerfModal]);
 
   const loadChallenges = useCallback(async () => {
     if (challengeLoadingRef.current) return;
@@ -475,69 +964,42 @@ export default function SocialPage() {
   }, [newChallTitle, newChallDesc, newChallExercise, newChallTarget, newChallUnit, newChallType, newChallDifficulty, newChallVisibility, circuitExercises, circuitRepos, circuitTours, loadChallenges]);
 
   useEffect(() => {
-    if (activeTab === 'defis') {
-      void loadChallenges();
-    }
-  }, [activeTab, loadChallenges]);
-
-  useEffect(() => {
-    if (activeTab !== 'boite' || !selectedConvFriendId) return;
-    const interval = setInterval(() => {
-      void loadMessages(selectedConvFriendId);
-      void loadConversations();
-    }, 4000);
-    return () => clearInterval(interval);
-  }, [activeTab, selectedConvFriendId, loadMessages, loadConversations]);
-
-  useEffect(() => {
     if (!chatContainerRef.current) return;
     chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
   }, [chat, chatLoading]);
 
 
   return (
-    <main className="flex-1 px-3 py-6 sm:px-6 md:px-8 sm:py-8 overflow-x-hidden bg-gradient-to-br from-slate-50 via-white to-slate-50 min-h-screen">
-      <div className="max-w-5xl w-full mx-auto">
-        {/* Header */}
-        <div className="mb-8 space-y-2">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-sky-400 to-emerald-400 flex items-center justify-center text-white font-black text-lg shadow-lg">
-              S
-            </div>
-            <div>
-              <h1 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight">Social Hub</h1>
-              <p className="text-sm text-gray-500">Connecte-toi, partage et joue avec ta communauté</p>
-            </div>
+    <main className="flex-1 relative overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.16),_transparent_30%),linear-gradient(180deg,#f8fbff_0%,#ffffff_38%,#eef6ff_100%)] min-h-[calc(100vh-72px)]">
+      <div className="absolute inset-x-0 top-0 z-20 px-3 pt-4 sm:px-6 md:px-8">
+        <div className="mx-auto flex max-w-6xl justify-center">
+          <div className="grid grid-cols-3 gap-2 rounded-2xl border border-white/70 bg-white/90 p-1.5 shadow-[0_12px_35px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+              {([
+                { key: 'feed' as Tab, label: 'Feed' },
+                { key: 'boite' as Tab, label: 'Messagerie' },
+                { key: 'performances' as Tab, label: 'Performance' },
+              ] as const).map((t) => (
+                <button
+                  key={t.key}
+                  onClick={() => setActiveTab(t.key)}
+                  className={`rounded-2xl px-4 py-3 text-xs font-bold transition sm:text-sm ${
+                    activeTab === t.key
+                      ? 'bg-slate-950 text-white shadow-[0_12px_24px_rgba(15,23,42,0.22)]'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
           </div>
         </div>
+      </div>
 
-        {/* Tabs Navigation */}
-        <div className="flex gap-1 sm:gap-2 rounded-2xl bg-white border border-gray-200 p-1.5 mb-8 shadow-sm overflow-x-auto">
-          {([
-            { key: 'feed' as Tab, label: 'Actualités' },
-            { key: 'boite' as Tab, label: 'Messages' },
-            { key: 'amis' as Tab, label: 'Amis' },
-            { key: 'performances' as Tab, label: 'Performances' },
-            { key: 'defis' as Tab, label: 'Défis' },
-            { key: 'jeux' as Tab, label: 'Jeux' },
-          ] as const).map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setActiveTab(t.key)}
-              className={`flex-shrink-0 px-4 sm:px-6 py-3 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 ${
-                activeTab === t.key ? 'bg-gradient-to-br from-sky-50 to-blue-50 text-sky-700 shadow-md border border-sky-200' : 'text-gray-600 hover:text-gray-800'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Content Sections */}
-        <div className="space-y-6">
+      <div className="mx-auto flex min-h-[calc(100vh-72px)] w-full max-w-6xl flex-col px-3 pb-6 pt-24 sm:px-6 md:px-8 sm:pb-8 sm:pt-28">
+        <div className="flex-1 space-y-6">
           {/* Feed Section */}
           {activeTab === 'feed' && (
-            <div className="space-y-6">
+            <section className="flex min-h-[calc(100vh-220px)] flex-col gap-6">
               {/* Composer */}
               <div className="rounded-3xl border border-gray-200 bg-white p-5 sm:p-6 shadow-sm">
                 <h2 className="text-lg font-bold text-gray-900 mb-4">Quoi de neuf ?</h2>
@@ -549,18 +1011,23 @@ export default function SocialPage() {
                     rows={4}
                     className="w-full resize-none bg-gray-50 text-gray-900 placeholder:text-gray-400 outline-none text-sm sm:text-base p-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-sky-400 focus:border-transparent transition"
                   />
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex flex-wrap items-center gap-2">
                       <p className={`text-xs font-semibold ${remaining < 20 ? 'text-amber-600' : 'text-gray-400'}`}>{remaining} caractères</p>
                       <label className="cursor-pointer flex items-center gap-1 text-xs font-semibold text-gray-400 hover:text-sky-600 transition">
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                         {uploadingImage ? 'Upload...' : 'Image'}
                         <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={(e) => void handleImageUpload(e)} disabled={uploadingImage} />
                       </label>
+                      <label className="cursor-pointer flex items-center gap-1 text-xs font-semibold text-gray-400 hover:text-sky-600 transition">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14m-9 5h8a2 2 0 002-2V7a2 2 0 00-2-2H6a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                        {uploadingVideo ? 'Compression...' : 'Vidéo'}
+                        <input type="file" accept="video/mp4,video/webm,video/quicktime" className="hidden" onChange={(e) => void handleVideoUpload(e)} disabled={uploadingVideo} />
+                      </label>
                     </div>
                     <button
                       onClick={() => void publishPost()}
-                      disabled={(!composer.trim() && !composerImageUrl) || posting}
+                      disabled={(!composer.trim() && !composerImageUrl && !composerVideoUrl) || posting}
                       className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-sky-600 to-blue-600 text-white text-sm font-bold disabled:opacity-50 hover:shadow-lg transition-all"
                     >
                       {posting ? 'Publication...' : 'Publier'}
@@ -568,8 +1035,21 @@ export default function SocialPage() {
                   </div>
                   {composerImageUrl && (
                     <div className="relative inline-block mt-2">
-                      <img src={composerImageUrl} alt="Apercu" className="max-h-32 rounded-xl border border-gray-200" />
+                      <img src={composerImageUrl} alt="Apercu" className="max-h-32 rounded-xl border border-gray-200 object-contain" />
                       <button onClick={() => setComposerImageUrl(null)} className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center shadow">✕</button>
+                    </div>
+                  )}
+                  {composerVideoUrl && (
+                    <div className="relative mt-2 inline-block">
+                      <video controls preload="metadata" className="max-h-40 rounded-xl border border-gray-200 bg-black object-contain">
+                        <source src={composerVideoUrl} />
+                      </video>
+                      <button onClick={() => { setComposerVideoUrl(null); setVideoProgress(null); }} className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center shadow">✕</button>
+                    </div>
+                  )}
+                  {videoProgress !== null && uploadingVideo && (
+                    <div className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-700">
+                      Compression et preparation de la video... {videoProgress}%
                     </div>
                   )}
                   {composerError && (
@@ -581,7 +1061,7 @@ export default function SocialPage() {
               </div>
 
               {/* Timeline */}
-              <div className="space-y-4">
+              <div className="flex-1 space-y-4 overflow-y-auto pr-1">
                 <div className="flex items-center justify-between px-1">
                   <h3 className="text-sm font-bold text-gray-600 uppercase tracking-wider">Fil d&apos;actualités</h3>
                   <button onClick={() => void loadFeed()} className="text-xs font-semibold text-sky-600 hover:text-sky-700">
@@ -606,9 +1086,11 @@ export default function SocialPage() {
                         <div className="p-4 sm:p-5">
                           <div className="flex items-start justify-between gap-3 mb-3">
                             <div className="flex items-center gap-3 flex-1">
-                              <Avatar letter={(post.author.pseudo || '?')[0]} size="sm" />
+                              <Link href={`/dashboard/profil/${post.author.id}`}>
+                                <UserAvatar src={post.author.profileImageUrl} name={post.author.pseudo} size="sm" />
+                              </Link>
                               <div className="flex-1">
-                                <p className="text-sm font-bold text-gray-900">@{post.author.pseudo}</p>
+                                <Link href={`/dashboard/profil/${post.author.id}`} className="text-sm font-bold text-gray-900 hover:underline">@{post.author.pseudo}</Link>
                                 <p className="text-xs text-gray-400">{formatRelativeDate(post.createdAt)}</p>
                               </div>
                             </div>
@@ -619,25 +1101,39 @@ export default function SocialPage() {
                             )}
                           </div>
 
-                          <p className="text-sm sm:text-base text-gray-800 leading-relaxed whitespace-pre-wrap mb-4">{
-                            (() => {
-                              const txt = post.content;
-                              if (txt.startsWith('__IMAGE__')) {
-                                const nlIdx = txt.indexOf('\n');
-                                const imgUrl = nlIdx > 9 ? txt.slice(9, nlIdx) : txt.slice(9);
-                                const textPart = nlIdx > 9 ? txt.slice(nlIdx + 1) : '';
+                          <div className="text-sm sm:text-base text-gray-800 leading-relaxed whitespace-pre-wrap mb-4">
+                            {(() => {
+                              const parsed = parseFeedContent(post.content);
+                              if (parsed.kind === 'image' && parsed.mediaUrl) {
                                 return (
                                   <>
-                                    <img src={imgUrl} alt="Publication" className="w-full max-h-80 object-cover rounded-xl border border-gray-200 mb-3" />
-                                    {textPart}
+                                    <img src={parsed.mediaUrl} alt="Publication" className="w-full max-h-80 object-contain rounded-xl border border-gray-200 mb-3 bg-slate-50" />
+                                    {parsed.text}
                                   </>
                                 );
                               }
-                              return txt;
-                            })()
-                          }</p>
+                              if (parsed.kind === 'video' && parsed.mediaUrl) {
+                                return (
+                                  <>
+                                    <video controls preload="metadata" className="w-full max-h-96 object-contain rounded-xl border border-gray-200 mb-3 bg-black">
+                                      <source src={parsed.mediaUrl} />
+                                    </video>
+                                    {parsed.text}
+                                  </>
+                                );
+                              }
+                              return parsed.text;
+                            })()}
+                          </div>
 
-                          <div className="flex items-center gap-6 text-xs text-gray-500 pb-4 border-b border-gray-100">
+                          <div className="flex flex-wrap items-center gap-2 sm:gap-6 text-xs text-gray-500 pb-4 border-b border-gray-100">
+                            {(post.rankingReasons?.length ?? 0) > 0 && (
+                              <div className="flex flex-wrap gap-1">
+                                {post.rankingReasons?.map((reason) => (
+                                  <span key={reason} className="rounded-full bg-sky-50 px-2 py-1 text-[11px] font-semibold text-sky-700">{reason}</span>
+                                ))}
+                              </div>
+                            )}
                             <button
                               onClick={() => void toggleLike(post.id, post.likedByMe)}
                               className={`font-semibold transition ${post.likedByMe ? 'text-rose-600' : 'text-gray-500 hover:text-gray-700'}`}
@@ -656,7 +1152,7 @@ export default function SocialPage() {
                             <div className="mt-4 pt-4 space-y-2 border-t border-gray-100">
                               {post.replies.map((reply) => (
                                 <div key={reply.id} className="text-xs sm:text-sm text-gray-700">
-                                  <p className="font-semibold text-gray-900">@{reply.author.pseudo}</p>
+                                  <Link href={`/dashboard/profil/${reply.author.id}`} className="font-semibold text-gray-900 hover:underline">@{reply.author.pseudo}</Link>
                                   <p className="text-gray-600 whitespace-pre-wrap">{reply.content}</p>
                                 </div>
                               ))}
@@ -689,34 +1185,38 @@ export default function SocialPage() {
                     );
                   })}
               </div>
-            </div>
+            </section>
           )}
 
           {/* Messages Section */}
           {activeTab === 'boite' && (
-            <div className="rounded-3xl border border-gray-200 bg-white p-5 sm:p-6 shadow-sm">
-              <h2 className="text-lg font-bold text-gray-900 mb-4">Messages</h2>
+            <section className="flex min-h-[calc(100vh-220px)] flex-col rounded-[32px] border border-slate-200 bg-white/95 p-4 shadow-[0_18px_60px_rgba(15,23,42,0.08)] sm:p-5">
+              <div className="mb-4 flex items-center justify-between gap-3 px-1">
+                <div>
+                  <h2 className="text-lg font-black text-slate-950">Messagerie</h2>
+                  <p className="text-sm text-slate-500">Conversation plein écran, accès rapide aux amis et profils suggérés.</p>
+                </div>
+                <button onClick={() => { void loadConversations(); void loadAmis(); void loadPublicProfiles(); }} className="text-xs font-semibold text-sky-600 hover:text-sky-700">Actualiser</button>
+              </div>
               {boiteLoading ? (
                 <div className="text-center py-8 text-gray-500">Chargement...</div>
               ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-4">
-                  <div className={`space-y-2 max-h-[520px] overflow-y-auto pr-1 ${mobileMsgView === 'chat' ? 'hidden lg:block' : 'block'}`}>
+                <div className="grid flex-1 gap-4 xl:grid-cols-[320px_minmax(0,1fr)_280px]">
+                  <div className={`space-y-2 overflow-y-auto rounded-[28px] border border-slate-200 bg-slate-50 p-3 ${mobileMsgView === 'chat' ? 'hidden xl:block' : 'block'}`}>
                     {conversations.length === 0 && (
                       <div className="p-4 rounded-xl border border-dashed border-gray-300 text-sm text-gray-500">
                         Aucune conversation existante.
                       </div>
                     )}
                     {conversations.map((conv) => (
-                      <div
-                        key={conv.friendId}
-                        onClick={() => openConversation(conv.friendId)}
-                        className={`p-4 rounded-xl border transition cursor-pointer ${selectedConvFriendId === conv.friendId ? 'bg-sky-50 border-sky-300 shadow-md' : 'border-gray-200 hover:bg-gray-50'}`}
-                      >
+                      <div key={conv.friendId} className={`p-4 rounded-xl border transition ${selectedConvFriendId === conv.friendId ? 'bg-sky-50 border-sky-300 shadow-md' : 'border-gray-200 hover:bg-gray-50'}`}>
                         <div className="flex items-center gap-3 justify-between">
                           <div className="flex items-center gap-3 flex-1 min-w-0">
-                            <Avatar letter={(conv.pseudo || '?')[0]} size="sm" />
+                            <Link href={`/dashboard/profil/${conv.friendId}`}>
+                              <UserAvatar src={conv.profileImageUrl} name={conv.pseudo} size="sm" />
+                            </Link>
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-semibold text-gray-900 truncate">@{conv.pseudo}</p>
+                              <Link href={`/dashboard/profil/${conv.friendId}`} className="text-sm font-semibold text-gray-900 truncate hover:underline block">@{conv.pseudo}</Link>
                               <p className="text-xs text-gray-500 break-words break-all line-clamp-2">{conv.dernier || 'Aucun message'}</p>
                             </div>
                           </div>
@@ -725,13 +1225,14 @@ export default function SocialPage() {
                             {conv.nonLu > 0 && <span className="inline-block mt-1 px-2 py-1 text-xs font-bold bg-sky-500 text-white rounded-full">{conv.nonLu}</span>}
                           </div>
                         </div>
+                        <button onClick={() => openConversation(conv.friendId)} className="mt-3 w-full rounded-xl bg-sky-100 px-3 py-2 text-xs font-semibold text-sky-700 hover:bg-sky-200">Ouvrir la conversation</button>
                       </div>
                     ))}
                   </div>
 
-                  <div className={`border border-gray-200 rounded-2xl min-h-[360px] overflow-hidden ${mobileMsgView === 'list' ? 'hidden lg:flex' : 'flex'} flex-col`}>
+                  <div className={`min-h-[480px] overflow-hidden rounded-[28px] border border-slate-200 bg-white ${mobileMsgView === 'list' ? 'hidden xl:flex' : 'flex'} flex-col`}> 
                     {!selectedConvFriendId ? (
-                      <div className="flex-1 flex items-center justify-center text-sm text-gray-500 px-4 text-center">
+                      <div className="flex-1 flex items-center justify-center text-sm text-gray-500 px-4 text-center bg-[linear-gradient(180deg,#ffffff,#f8fbff)]">
                         Sélectionne une conversation pour voir la discussion.
                       </div>
                     ) : (
@@ -739,7 +1240,7 @@ export default function SocialPage() {
                         <div className="px-4 py-3 border-b border-gray-100 bg-gray-50 text-sm font-semibold text-gray-800 flex items-center gap-2">
                           <button
                             onClick={() => setMobileMsgView('list')}
-                            className="lg:hidden p-1.5 rounded-lg hover:bg-gray-200 text-gray-600"
+                            className="xl:hidden p-1.5 rounded-lg hover:bg-gray-200 text-gray-600"
                             aria-label="Retour"
                           >
                             ←
@@ -752,7 +1253,7 @@ export default function SocialPage() {
                           })()}
                         </div>
 
-                        <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 space-y-2 bg-white">
+                        <div ref={chatContainerRef} className="flex-1 overflow-y-auto bg-[linear-gradient(180deg,#ffffff,#f8fbff)] p-4 pb-24 space-y-2">
                           {chatLoading ? (
                             <p className="text-sm text-gray-500">Chargement des messages...</p>
                           ) : chat.length === 0 ? (
@@ -769,7 +1270,7 @@ export default function SocialPage() {
                           )}
                         </div>
 
-                        <div className="p-3 border-t border-gray-100 bg-white">
+                        <div className="sticky bottom-0 z-10 border-t border-gray-100 bg-white p-3 pb-[calc(env(safe-area-inset-bottom)+12px)] shadow-[0_-8px_24px_rgba(15,23,42,0.04)]">
                           {msgError && (
                             <div className="mb-2 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">
                               {msgError}
@@ -800,96 +1301,65 @@ export default function SocialPage() {
                       </>
                     )}
                   </div>
-                </div>
-              )}
-            </div>
-          )}
 
-          {/* Friends Section */}
-          {activeTab === 'amis' && (
-            <div className="rounded-3xl border border-gray-200 bg-white p-5 sm:p-6 shadow-sm">
-              <h2 className="text-lg font-bold text-gray-900 mb-4">Réseau</h2>
-              {amiseLoading ? (
-                <div className="text-center py-8 text-gray-500">Chargement...</div>
-              ) : acceptedAmis.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">Aucun ami pour le moment</div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {acceptedAmis.map((ami) => (
-                      <div key={ami.id} className="p-4 rounded-xl border border-gray-200 hover:bg-gray-50 transition">
-                        <div className="flex items-center gap-3 mb-2">
-                          <Avatar letter={(ami.pseudo || '?')[0]} size="md" />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-bold text-gray-900 truncate">@{ami.pseudo}</p>
+                  <div className="grid gap-4 content-start">
+                    <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-4">
+                      <h3 className="text-sm font-black text-gray-900">Amis</h3>
+                      <div className="mt-3 space-y-2">
+                        {acceptedAmis.length === 0 && <p className="text-sm text-gray-500">Aucun ami pour le moment.</p>}
+                        {acceptedAmis.map((ami) => (
+                          <div key={ami.id} className="rounded-xl border border-gray-200 bg-white p-3">
+                            <div className="flex items-center gap-3">
+                              <Link href={`/dashboard/profil/${ami.friendId}`}>
+                                <UserAvatar src={ami.profileImageUrl} name={ami.pseudo} size="sm" />
+                              </Link>
+                              <div className="min-w-0 flex-1">
+                                <Link href={`/dashboard/profil/${ami.friendId}`} className="block truncate text-sm font-semibold text-gray-900 hover:underline">@{ami.pseudo}</Link>
+                                <p className="truncate text-xs text-gray-500">{ami.nom}</p>
+                              </div>
+                            </div>
+                            <div className="mt-3 grid grid-cols-2 gap-2">
+                              <button onClick={() => openConversation(ami.friendId)} className="rounded-xl bg-sky-100 px-3 py-2 text-xs font-semibold text-sky-700 hover:bg-sky-200">Message</button>
+                              <Link href={`/dashboard/profil/${ami.friendId}`} className="rounded-xl border border-gray-200 px-3 py-2 text-center text-xs font-semibold text-gray-700 hover:bg-gray-50">Voir profil</Link>
+                            </div>
                           </div>
-                        </div>
-                        <button 
-                          onClick={() => openConversation(ami.friendId)}
-                          className="w-full mt-2 px-3 py-2 text-xs font-semibold rounded-lg bg-sky-100 text-sky-700 hover:bg-sky-200 transition"
-                        >
-                          Message
-                        </button>
+                        ))}
                       </div>
-                    ))}
+                    </div>
+
+                    <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-4">
+                      <h3 className="text-sm font-black text-gray-900">Profils suggeres</h3>
+                      <div className="mt-3 space-y-2">
+                        {profilesLoading && <p className="text-sm text-gray-500">Chargement des profils...</p>}
+                        {publicProfiles.slice(0, 6).map((profile) => (
+                          <div key={profile.id} className="rounded-xl border border-gray-200 bg-white p-3">
+                            <div className="flex items-center gap-3 justify-between">
+                              <div className="flex items-center gap-3 min-w-0">
+                                <Link href={`/dashboard/profil/${profile.id}`}>
+                                  <UserAvatar src={profile.profileImageUrl} name={profile.pseudo} size="sm" />
+                                </Link>
+                                <div className="min-w-0">
+                                  <Link href={`/dashboard/profil/${profile.id}`} className="block truncate text-sm font-semibold text-gray-900 hover:underline">@{profile.pseudo}</Link>
+                                  <p className="truncate text-xs text-gray-500">{profile.isPrivate ? 'Profil prive' : `${profile.level} · ${profile.xp} XP`}</p>
+                                </div>
+                              </div>
+                              <button onClick={() => void toggleFollow(profile)} disabled={followLoading === profile.id} className={`rounded-xl px-3 py-2 text-xs font-bold ${profile.followedByMe ? 'bg-gray-900 text-white' : 'bg-sky-100 text-sky-700 hover:bg-sky-200'}`}>
+                                {followLoading === profile.id ? '...' : profile.followedByMe ? 'Abonne' : 'Suivre'}
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
-            </div>
-          )}
-
-          {/* Games Section */}
-          {activeTab === 'jeux' && (
-            <div className="space-y-6">
-              {/* Games Online */}
-              <div className="rounded-3xl border border-gray-200 bg-white p-5 sm:p-6 shadow-sm">
-                <h2 className="text-lg font-bold text-gray-900 mb-4">🌐 Jeux en Ligne</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {[
-                    { name: 'Duel 1v1', icon: '⚔️', path: '/dashboard/mini-jeux?game=duel' },
-                    { name: 'Défi Ami', icon: '🎯', path: '/dashboard/mini-jeux?game=defiami' },
-                    { name: 'Top Semaine', icon: '📊', path: '/dashboard/mini-jeux?game=topsemaine' },
-                    { name: 'Rush Classement', icon: '🚀', path: '/dashboard/mini-jeux?game=rush' },
-                  ].map((game) => (
-                    <Link key={game.name} href={game.path}>
-                      <div className="p-5 rounded-xl border border-gray-200 hover:border-sky-300 bg-gradient-to-br hover:from-sky-50 hover:to-blue-50 cursor-pointer transition">
-                        <div className="text-3xl mb-2">{game.icon}</div>
-                        <p className="text-sm font-bold text-gray-900">{game.name}</p>
-                        <p className="text-xs text-gray-500 mt-1">Participe maintenant</p>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-
-              {/* Games Offline */}
-              <div className="rounded-3xl border border-gray-200 bg-white p-5 sm:p-6 shadow-sm">
-                <h2 className="text-lg font-bold text-gray-900 mb-4">📱 Jeux Hors Ligne</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {[
-                    { name: 'Roulette', icon: '🎰', path: '/dashboard/mini-jeux?game=roulette' },
-                    { name: 'Défi Chrono', icon: '⏱️', path: '/dashboard/mini-jeux?game=chrono' },
-                    { name: 'Escalade', icon: '🗻', path: '/dashboard/mini-jeux?game=escalade' },
-                    { name: 'Bingo Fitness', icon: '🎯', path: '/dashboard/mini-jeux?game=bingo' },
-                    { name: 'Dé Fitness', icon: '🎲', path: '/dashboard/mini-jeux?game=de' },
-                    { name: 'Shuffle HIIT', icon: '🔥', path: '/dashboard/mini-jeux?game=hiit' },
-                    { name: 'Memory Muscu', icon: '🧠', path: '/dashboard/mini-jeux?game=memory' },
-                    { name: 'Combo Breaker', icon: '🔗', path: '/dashboard/mini-jeux?game=combo' },
-                  ].map((game) => (
-                    <Link key={game.name} href={game.path}>
-                      <div className="p-5 rounded-xl border border-gray-200 hover:border-emerald-300 bg-gradient-to-br hover:from-emerald-50 hover:to-teal-50 cursor-pointer transition">
-                        <div className="text-3xl mb-2">{game.icon}</div>
-                        <p className="text-sm font-bold text-gray-900">{game.name}</p>
-                        <p className="text-xs text-gray-500 mt-1">Joue en solo</p>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            </div>
+            </section>
           )}
 
           {/* Performances Section */}
           {activeTab === 'performances' && (
-            <div className="space-y-4">
+            <section className="flex min-h-[calc(100vh-220px)] flex-col gap-4">
               <div className="rounded-3xl border border-gray-200 bg-white p-5 sm:p-6 shadow-sm">
                 <h2 className="text-lg font-bold text-gray-900 mb-2">Performances</h2>
                 <p className="text-sm text-gray-500 mb-5">
@@ -898,142 +1368,229 @@ export default function SocialPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
                   <button
-                    onClick={openPerformanceHub}
+                    onClick={() => setShowPerfModal(true)}
                     className="w-full px-4 py-3 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-sm font-semibold transition"
                   >
                     + Ajouter une performance
                   </button>
                   <button
-                    onClick={openPerformanceHub}
+                    onClick={() => setShowPerfModal(true)}
                     className="w-full px-4 py-3 rounded-xl bg-white border border-sky-200 hover:border-sky-300 text-sky-700 text-sm font-semibold transition"
                   >
-                    Ouvrir le classement performances
+                    Enregistrer un nouveau record
                   </button>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2 mb-5">
+                  <Link href="/dashboard/analyse" className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-4 text-sm font-semibold text-gray-700 hover:bg-gray-100">Voir la progression detaillee</Link>
+                  <Link href="/dashboard/mini-jeux?game=duel" className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-4 text-sm font-semibold text-gray-700 hover:bg-gray-100">Lancer un duel ou un defi</Link>
                 </div>
 
                 <div className="rounded-2xl border border-dashed border-gray-300 bg-slate-50 p-4">
                   <p className="text-xs text-gray-600">
-                    L&apos;ajout détaillé des performances est disponible dans l&apos;espace Réseau (onglet Performances),
-                    avec sélection du spot, exercice, score, preuve vidéo et validation.
+                    Les preuves video sont compressees cote client a 480p maximum dans l espace Performances pour rester legeres et directement exploitables pour la validation communautaire.
                   </p>
                 </div>
               </div>
-            </div>
-          )}
 
-          {/* Challenges Section */}
-          {activeTab === 'defis' && (
-            <div className="space-y-4">
-              {/* Header + create button */}
-              <div className="flex flex-col sm:flex-row items-start sm:justify-between gap-2">
-                <div>
-                  <h2 className="text-lg font-bold text-gray-900">Défis Sportifs</h2>
-                  <p className="text-xs sm:text-sm text-gray-500">Créez et relevez des défis personnels</p>
-                </div>
-                <button
-                  onClick={() => setShowCreateChallenge((v) => !v)}
-                  className="w-full sm:w-auto px-4 py-2 bg-gray-900 hover:bg-gray-700 text-white text-xs font-semibold rounded-xl transition shrink-0"
-                >
-                  {showCreateChallenge ? '✕ Annuler' : '+ Créer un défi'}
-                </button>
-              </div>
-
-              {/* Create challenge form - simplified */}
-              {showCreateChallenge && (
-                <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5 space-y-3">
-                  <p className="text-sm font-semibold text-gray-800">Nouveau Défi</p>
-                  <input
-                    type="text"
-                    placeholder="Titre du défi"
-                    value={newChallTitle}
-                    onChange={(e) => setNewChallTitle(e.target.value)}
-                    className="w-full px-3 py-2 text-sm text-gray-900 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none"
-                  />
-                  <textarea
-                    placeholder="Description"
-                    value={newChallDesc}
-                    onChange={(e) => setNewChallDesc(e.target.value)}
-                    rows={2}
-                    className="w-full px-3 py-2 text-sm text-gray-900 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none resize-none"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Exercice (ex: Pompes)"
-                    value={newChallExercise}
-                    onChange={(e) => setNewChallExercise(e.target.value)}
-                    className="w-full px-3 py-2 text-sm text-gray-900 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none"
-                  />
-                  <div className="flex gap-2">
-                    <input
-                      type="number"
-                      placeholder="Objectif"
-                      value={newChallTarget}
-                      onChange={(e) => setNewChallTarget(e.target.value)}
-                      className="flex-1 px-3 py-2 text-sm text-gray-900 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none"
-                    />
-                    <select
-                      value={newChallUnit}
-                      onChange={(e) => setNewChallUnit(e.target.value)}
-                      className="px-3 py-2 text-sm text-gray-900 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 outline-none"
-                    >
-                      <option>reps</option>
-                      <option>km</option>
-                      <option>min</option>
-                      <option>séries</option>
-                    </select>
+              <div className="rounded-3xl border border-gray-200 bg-white p-5 sm:p-6 shadow-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-base font-black text-gray-900">Validation communautaire</h3>
+                    <p className="text-sm text-gray-500">Sondage public sur les repetitions: oui ou non.</p>
                   </div>
-                  <button
-                    onClick={() => void createChallenge()}
-                    disabled={createChallengeLoading || !newChallTitle || !newChallDesc || !newChallExercise || !newChallTarget}
-                    className="w-full px-4 py-2 bg-sky-600 hover:bg-sky-700 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition"
-                  >
-                    {createChallengeLoading ? 'Création...' : 'Publier le défi'}
-                  </button>
+                  <button onClick={() => void loadCommunityPerformances()} className="text-xs font-semibold text-sky-600 hover:text-sky-700">Actualiser</button>
                 </div>
-              )}
 
-              {/* Challenges List */}
-              <div className="rounded-2xl border border-gray-200 bg-white p-5 sm:p-6 shadow-sm">
-                {challengeLoading ? (
-                  <div className="text-center py-8 text-gray-500">Chargement des défis...</div>
-                ) : challenges.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">Aucun défi disponible</div>
+                {communityLoading ? (
+                  <div className="text-center py-8 text-gray-500">Chargement des validations...</div>
+                ) : communityPerformances.length === 0 ? (
+                  <div className="mt-4 rounded-2xl border border-dashed border-gray-300 bg-slate-50 p-6 text-center text-sm text-gray-500">
+                    Aucune performance en attente de vote pour le moment.
+                  </div>
                 ) : (
-                  <div className="space-y-3">
-                    {challenges.map((challenge) => (
-                      <div key={challenge.id} className="p-4 rounded-xl border border-gray-200 hover:bg-gray-50 transition">
+                  <div className="mt-4 space-y-4">
+                    {communityPerformances.map((performance) => (
+                      <article key={performance.id} className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
                         <div className="flex items-start justify-between gap-3">
-                          <div className="flex-1">
-                            <p className="text-sm font-bold text-gray-900">{challenge.title}</p>
-                            <p className="text-xs text-gray-500 mt-1">{challenge.description}</p>
-                            <p className="text-xs text-gray-400 mt-1">
-                              Objectif: {challenge.target} {challenge.unit} • {challenge._count?.completions || 0} complétions
-                            </p>
+                          <div>
+                            <Link href={`/dashboard/profil/${performance.author.id}`} className="text-sm font-bold text-gray-900 hover:underline block">@{performance.author.pseudo}</Link>
+                            <p className="text-xs text-gray-500">{performance.author.level} · {performance.author.xp} XP{performance.author.verified ? ' · verifie' : ''}</p>
                           </div>
-                          <button
-                            onClick={() => void completeChallenge(challenge.id)}
-                            disabled={challengeActionLoading.has(challenge.id) || challenge.completed}
-                            className={`px-3 py-2 text-xs font-semibold rounded-lg transition whitespace-nowrap ${
-                              challenge.completed
-                                ? 'bg-green-100 text-green-700'
-                                : 'bg-sky-100 text-sky-700 hover:bg-sky-200'
-                            }`}
-                          >
-                            {challengeActionLoading.has(challenge.id) ? '...' : challenge.completed ? '✓ Complété' : 'Relever'}
-                          </button>
+                          <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold uppercase ${performance.status === 'validated' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                            {performance.status === 'validated' ? 'validee' : 'a verifier'}
+                          </span>
                         </div>
-                        {challengeNotif[challenge.id] && (
-                          <p className="text-xs text-green-600 font-semibold mt-2">{challengeNotif[challenge.id]}</p>
+
+                        <div className="mt-3 flex items-center justify-between gap-3">
+                          <p className="text-sm text-gray-700">{performance.exercise} · <span className="font-black text-gray-900">{performance.score} {performance.unit}</span></p>
+                          <p className="text-xs text-gray-500">{performance.spot.name}{performance.spot.city ? `, ${performance.spot.city}` : ''}</p>
+                        </div>
+
+                        {performance.videoUrl && (
+                          <ZipVideoPlayer url={performance.videoUrl} className="mt-3 w-full rounded-xl border border-gray-200 bg-black max-h-80" />
                         )}
-                      </div>
+
+                        <div className="mt-3 rounded-xl border border-gray-200 bg-white px-3 py-3">
+                          <p className="text-sm font-semibold text-gray-900">{performance.validationQuestion}</p>
+                          <p className="mt-1 text-xs text-gray-500">Votes oui: {performance.validation.accepted} · non: {performance.validation.rejected}</p>
+                          {performance.canVote ? (
+                            <div className="mt-3 flex gap-2">
+                              <button
+                                onClick={() => void votePerformance(performance.id, true)}
+                                className={`flex-1 rounded-xl px-3 py-2 text-sm font-bold ${performance.validation.myVote === 'accepted' ? 'bg-emerald-600 text-white' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'}`}
+                              >
+                                Oui, valide
+                              </button>
+                              <button
+                                onClick={() => void votePerformance(performance.id, false)}
+                                className={`flex-1 rounded-xl px-3 py-2 text-sm font-bold ${performance.validation.myVote === 'rejected' ? 'bg-red-600 text-white' : 'bg-red-100 text-red-700 hover:bg-red-200'}`}
+                              >
+                                Non, a revoir
+                              </button>
+                            </div>
+                          ) : (
+                            <p className="mt-3 text-xs font-semibold text-gray-500">Tu ne peux pas voter sur ta propre performance.</p>
+                          )}
+                        </div>
+                      </article>
                     ))}
                   </div>
                 )}
               </div>
-            </div>
+            </section>
           )}
         </div>
       </div>
+
+      {/* Performance Modal */}
+      {showPerfModal && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="w-full max-w-lg rounded-3xl bg-white shadow-2xl p-6 space-y-5 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-black text-gray-900">Ajouter une performance</h2>
+                <p className="text-xs text-gray-500 mt-0.5">Enregistre ton record et demande une validation communautaire.</p>
+              </div>
+              <button
+                onClick={closePerfModal}
+                className="p-2 rounded-xl hover:bg-gray-100 text-gray-500 transition"
+                aria-label="Fermer"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {perfModalError && (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                {perfModalError}
+              </div>
+            )}
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-2">Exercice</label>
+                <select
+                  value={perfModalExercise}
+                  onChange={(e) => setPerfModalExercise(e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-400"
+                >
+                  {PERF_EXERCISES.map((ex) => (
+                    <option key={ex.key} value={ex.key}>{ex.label} ({ex.unit})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-2">
+                  Score ({PERF_EXERCISES.find((e) => e.key === perfModalExercise)?.unit ?? 'reps'})
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  step="any"
+                  value={perfModalScore}
+                  onChange={(e) => setPerfModalScore(e.target.value)}
+                  placeholder="Ex : 15"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-400"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-2">Visibilite</label>
+                <div className="flex gap-2">
+                  {(['public', 'private'] as const).map((v) => (
+                    <button
+                      key={v}
+                      onClick={() => setPerfModalVisibility(v)}
+                      className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-bold transition ${
+                        perfModalVisibility === v ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                      }`}
+                    >
+                      {v === 'public' ? 'Public' : 'Prive'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-2">Preuve video (optionnel, max 200 MB)</label>
+                {perfModalVideoFile ? (
+                  <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+                    <span className="text-sm font-semibold text-gray-700 truncate">{perfModalVideoFile.name}</span>
+                    <button
+                      onClick={() => { setPerfModalVideoFile(null); setPerfModalVideoProgress(null); }}
+                      className="ml-3 flex-shrink-0 text-xs font-bold text-red-500 hover:text-red-600"
+                    >
+                      Retirer
+                    </button>
+                  </div>
+                ) : (
+                  <label className="block w-full cursor-pointer rounded-xl border-2 border-dashed border-gray-200 px-4 py-6 text-center hover:border-sky-300 transition">
+                    <p className="text-sm font-semibold text-gray-500">Choisir une video</p>
+                    <p className="text-xs text-gray-400 mt-1">mp4, webm ou mov · max 200 MB</p>
+                    <input
+                      type="file"
+                      accept="video/mp4,video/webm,video/quicktime"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (!f) return;
+                        if (!PERF_ALLOWED_VIDEO_TYPES.includes(f.type)) {
+                          setPerfModalError('Format non supporte. Utilise mp4, webm ou mov.');
+                          return;
+                        }
+                        if (f.size > PERF_MAX_VIDEO_SIZE) {
+                          setPerfModalError('Video trop volumineuse (max 200 MB).');
+                          return;
+                        }
+                        setPerfModalError('');
+                        setPerfModalVideoFile(f);
+                        e.target.value = '';
+                      }}
+                    />
+                  </label>
+                )}
+                {perfModalVideoProgress !== null && (
+                  <div className="mt-2 rounded-xl bg-sky-50 border border-sky-200 px-4 py-2.5 text-xs font-semibold text-sky-700">
+                    Pipeline : compression 480p → ZIP → upload... {perfModalVideoProgress}%
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <button
+              onClick={() => void submitPerfModal()}
+              disabled={!perfModalScore || perfModalSubmitting}
+              className="w-full rounded-2xl bg-sky-600 py-3.5 text-sm font-black text-white disabled:opacity-50 hover:bg-sky-500 transition"
+            >
+              {perfModalSubmitting ? 'Enregistrement...' : 'Enregistrer la performance'}
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

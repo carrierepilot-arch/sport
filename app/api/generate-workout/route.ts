@@ -308,6 +308,12 @@ export async function POST(req: NextRequest) {
  const token = req.headers.get('authorization')?.replace('Bearer ', '');
  const payload = token ? verifyToken(token) : null;
  const requesterUserId = payload?.userId || null;
+ const userProfile = requesterUserId
+ ? await prisma.user.findUnique({
+ where: { id: requesterUserId },
+ select: { level: true, levelTestData: true, physicalData: true },
+ })
+ : null;
 
  const providerCounters: ProviderCounters = { wgerCalls: 0, exerciseDbCalls: 0, ncbiCalls: 0 };
 
@@ -401,7 +407,10 @@ ${equipements?.length ? `L'utilisateur possède aussi du matériel personnel : $
  const tempsMinutes: Record<string, number> = { '30min': 30, '1h': 60, '1h30': 90, '2h': 120 };
  const sessionMinutes = tempsMinutes[tempsSeance] || 60;
  const avgMinPerExercice = 6;
- const targetExercices = Math.max(4, Math.round(sessionMinutes / avgMinPerExercice));
+ const isLongProgramme = dureeProgramme === '2_mois' || dureeProgramme === '3_mois';
+ const targetExercices = isLongProgramme
+ ? Math.max(4, Math.min(6, Math.round(sessionMinutes / 10)))
+ : Math.max(4, Math.round(sessionMinutes / avgMinPerExercice));
 
  const dureeConstraint = `\n\nCONTRAINTE DUREE DE SEANCE (TRES IMPORTANT - RESPECTER ABSOLUMENT) :
 La seance DOIT durer EXACTEMENT ${sessionMinutes} minutes.
@@ -417,6 +426,28 @@ Pour atteindre cette duree, chaque jour DOIT contenir entre ${targetExercices - 
  ? `\n\nCONTRAINTE PROGRESSION (TRES IMPORTANT) :\nLe programme dure ${nbSemaines} semaines. Progression obligatoire semaine par semaine.`
  : '';
 
+ const levelTestData = userProfile?.levelTestData && typeof userProfile.levelTestData === 'object'
+ ? userProfile.levelTestData as Record<string, unknown>
+ : null;
+ const latestPhysicalEntry = Array.isArray(userProfile?.physicalData) && userProfile.physicalData.length > 0
+ ? userProfile.physicalData[userProfile.physicalData.length - 1] as Record<string, unknown>
+ : null;
+ const enduranceResults = Array.isArray(levelTestData?.resultats) ? levelTestData.resultats as unknown[] : [];
+ const manualForceData = levelTestData?.manualForce && typeof levelTestData.manualForce === 'object'
+ ? levelTestData.manualForce as Record<string, unknown>
+ : null;
+ const profileContext = `\n\nPROFIL ATHLETE :
+- Niveau enregistre : ${userProfile?.level || 'intermediaire'}${typeof levelTestData?.manualLevel === 'string' ? `\n- Niveau declare au test : ${String(levelTestData.manualLevel)}` : ''}${typeof levelTestData?.detectedLevel === 'string' ? `\n- Niveau detecte au test : ${String(levelTestData.detectedLevel)}` : ''}${enduranceResults.length ? `\n- Resultats test endurance : ${enduranceResults.map((value, index) => `${index + 1}:${String(value)}`).join(', ')}` : ''}${manualForceData ? `\n- Force lestee declaree : ${Object.entries(manualForceData).map(([key, value]) => `${key}=${String(value)}`).join(', ')}` : ''}${latestPhysicalEntry ? `\n- Dernieres donnees physiques : ${Object.entries(latestPhysicalEntry).filter(([, value]) => value !== null && value !== '').map(([key, value]) => `${key}=${String(value)}`).join(', ')}` : ''}
+Utilise IMPERATIVEMENT ces donnees pour calibrer la difficulte, le volume, la progression et les variantes.`;
+ const multiWeekCompactness = isLongProgramme
+ ? `\n\nCONTRAINTE DE SORTIE LONGUE DUREE :
+Programme long (${nbSemaines} semaines). Reste compact et exploitable :
+- 4 a 6 exercices maximum par jour
+- descriptions courtes
+- progression visible semaine par semaine
+- pas de texte superflu hors JSON`
+ : '';
+
  const singleWeekSchema = `{"jours":[{"jour":"Lundi","focus":"Dos","exercices":[{"nom":"Tractions","series":3,"reps":"8-10","repos":"90s","conseil":"..."}]}],"conseils_generaux":"...","progression_4_semaines":"..."}`;
  const multiWeekSchema = `{"semaines":[{"semaine":1,"description":"...","jours":[{"jour":"Lundi","focus":"Dos","exercices":[{"nom":"Tractions","series":3,"reps":"8-10","repos":"90s"}]}]}],"conseils_generaux":"...","progression_4_semaines":"..."}`;
 
@@ -424,7 +455,7 @@ Pour atteindre cette duree, chaque jour DOIT contenir entre ${targetExercices - 
  ? `\nIMPORTANT: Reponds UNIQUEMENT en JSON valide (pas de texte avant ni apres, pas de commentaires). Structure OBLIGATOIRE avec "semaines" TABLEAU de ${nbSemaines} objets, chaque objet ayant "semaine" (nombre), "description" (string), "jours" TABLEAU d'objets avec "jour","focus","exercices". Chaque exercice doit avoir "nom","series" (nombre), "reps" (string ex: "8-10"), "repos" (string ex: "90s"), "conseil" (string optionnel). Schema: ${multiWeekSchema}`
  : `\nIMPORTANT: Reponds UNIQUEMENT en JSON valide (pas de texte avant ni apres, pas de commentaires). Structure OBLIGATOIRE: "jours" DOIT etre un TABLEAU (array) d'objets, jamais un objet/dictionnaire. Chaque objet jour doit avoir "jour" (nom du jour), "focus" (string), "exercices" (TABLEAU). Chaque exercice doit avoir "nom","series" (nombre), "reps" (string ex: "8-10"), "repos" (string ex: "90s"), "conseil" (string optionnel). Schema: ${singleWeekSchema}`;
 
- const prompt = `Tu es un coach de street workout et fitness expert. Cree un programme d'entrainement personnalise et detaille en francais.${lieuConstraint}${dureeConstraint}${progressionConstraint}
+ const prompt = `Tu es un coach de street workout et fitness expert. Cree un programme d'entrainement personnalise et detaille en francais.${lieuConstraint}${dureeConstraint}${progressionConstraint}${multiWeekCompactness}${profileContext}
 
 Informations de l'utilisateur :
 - Objectif principal : ${objectif || 'general'}
@@ -443,7 +474,7 @@ ${formatInstruction}`;
  const totalExercices = targetExercices * nbJours;
  const sessionTokens = Math.max(3000, totalExercices * tokensPerExercice + 1200);
  const maxTokens = isMultiWeek
- ? Math.min(16000, 3000 + nbSemaines * nbJours * targetExercices * tokensPerExercice)
+ ? Math.min(14000, 2200 + nbSemaines * nbJours * targetExercices * 45)
  : Math.min(10000, sessionTokens);
 
  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });

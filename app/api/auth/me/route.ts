@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/auth';
+import { getProfileImageUrl, getProfileVisibility } from '@/lib/social';
 
 export async function GET(request: NextRequest) {
  try {
@@ -55,6 +56,8 @@ export async function GET(request: NextRequest) {
  xp: user.xp ?? 0,
  equipmentData: user.equipmentData ?? null,
  levelTestData: user.levelTestData ?? null,
+ profileImageUrl: getProfileImageUrl(user.equipmentData),
+ profileVisibility: getProfileVisibility(user.equipmentData),
  },
  });
  } catch (error) {

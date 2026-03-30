@@ -1,11 +1,16 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
+import { UserAvatar } from '@/components/UserAvatar';
 
 interface LeaderboardEntry {
  rank: number;
+ elo: number;
+ league: string;
  userId: string;
  pseudo: string;
+ profileImageUrl?: string | null;
  score: number;
  unit: string;
  spotName: string;
@@ -20,11 +25,31 @@ interface LeaderboardResponse {
  myEntry: LeaderboardEntry | null;
 }
 
+interface TeamLeaderboardEntry {
+ rank: number;
+ groupId: string;
+ groupName: string;
+ membersCount: number;
+ totalScore: number;
+ avgScore: number;
+ isMember: boolean;
+ topMember: { userId: string; pseudo: string; score: number } | null;
+}
+
+interface CityLeaderboardEntry {
+ rank: number;
+ city: string;
+ totalScore: number;
+ participants: number;
+ topAthlete: { userId: string; pseudo: string; score: number } | null;
+}
+
 const EXERCISES = [
  { key: 'tractions', label: 'Tractions', emoji: '' },
  { key: 'pompes', label: 'Pompes', emoji: '' },
  { key: 'dips', label: 'Dips', emoji: '' },
  { key: 'squats', label: 'Squats', emoji: '' },
+ { key: 'muscle_ups', label: 'Muscle-ups', emoji: '' },
  { key: 'tractions_lestees', label: 'Tractions lestées', emoji: '' },
  { key: 'dips_lestes', label: 'Dips lestés', emoji: '' },
 ];
@@ -45,6 +70,8 @@ export default function ClassementPage() {
  const [data, setData] = useState<LeaderboardResponse | null>(null);
  const [loading, setLoading] = useState(false);
  const [myUserId, setMyUserId] = useState<string | null>(null);
+ const [teams, setTeams] = useState<TeamLeaderboardEntry[]>([]);
+ const [cities, setCities] = useState<CityLeaderboardEntry[]>([]);
 
  useEffect(() => {
  const raw = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
@@ -67,7 +94,39 @@ export default function ClassementPage() {
  }
  }, []);
 
+ const fetchTeamsLeaderboard = useCallback(async () => {
+ const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+ if (!token) return;
+ try {
+ const res = await fetch('/api/groups/leaderboard', {
+ headers: { Authorization: `Bearer ${token}` },
+ });
+ if (!res.ok) return;
+ const payload = await res.json();
+ setTeams(payload.leaderboard ?? []);
+ } catch {
+ // noop
+ }
+ }, []);
+
+ const fetchCitiesLeaderboard = useCallback(async () => {
+ const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+ if (!token) return;
+ try {
+ const res = await fetch('/api/performances/cities/leaderboard', {
+ headers: { Authorization: `Bearer ${token}` },
+ });
+ if (!res.ok) return;
+ const payload = await res.json();
+ setCities(payload.leaderboard ?? []);
+ } catch {
+ // noop
+ }
+ }, []);
+
  useEffect(() => { fetchLeaderboard(selectedExercise); }, [selectedExercise, fetchLeaderboard]);
+ useEffect(() => { fetchTeamsLeaderboard(); }, [fetchTeamsLeaderboard]);
+ useEffect(() => { fetchCitiesLeaderboard(); }, [fetchCitiesLeaderboard]);
 
  const currentExercise = EXERCISES.find(e => e.key === selectedExercise)!;
  const isMyEntryInTop = data?.leaderboard.some(e => e.userId === myUserId);
@@ -108,6 +167,52 @@ export default function ClassementPage() {
  <p className="text-[11px] sm:text-xs text-gray-400 font-medium uppercase tracking-wide break-words pr-1">
  {data.total} athlète{data.total !== 1 ? 's' : ''} classé{data.total !== 1 ? 's' : ''} — {currentExercise.emoji} {currentExercise.label}
  </p>
+ )}
+
+ {/* Team leaderboard */}
+ {teams.length > 0 && (
+ <div className="grid gap-4 md:grid-cols-2">
+ <div className="bg-white rounded-2xl border border-gray-100 p-4 sm:p-5">
+ <div className="flex items-center justify-between">
+ <h2 className="text-sm sm:text-base font-black text-gray-900">Top équipes</h2>
+ <span className="text-[11px] text-gray-400 uppercase tracking-wide">Global</span>
+ </div>
+ <div className="mt-3 space-y-2">
+ {teams.slice(0, 5).map((team) => (
+ <div key={team.groupId} className={`rounded-xl border px-3 py-2.5 ${team.isMember ? 'border-blue-200 bg-blue-50' : 'border-gray-200 bg-gray-50'}`}>
+ <div className="flex items-center justify-between gap-2">
+ <p className="text-sm font-semibold text-gray-900 truncate">#{team.rank} {team.groupName}</p>
+ <p className="text-sm font-black text-gray-900 tabular-nums">{team.totalScore}</p>
+ </div>
+ <p className="mt-1 text-[11px] text-gray-500">
+ {team.membersCount} membre{team.membersCount > 1 ? 's' : ''} · moyenne {team.avgScore} · top {team.topMember?.pseudo ?? 'n/a'}
+ </p>
+ </div>
+ ))}
+ </div>
+ </div>
+ {cities.length > 0 && (
+ <div className="bg-white rounded-2xl border border-gray-100 p-4 sm:p-5">
+ <div className="flex items-center justify-between">
+ <h2 className="text-sm sm:text-base font-black text-gray-900">Villes en duel</h2>
+ <span className="text-[11px] text-gray-400 uppercase tracking-wide">Inter-villes</span>
+ </div>
+ <div className="mt-3 space-y-2">
+ {cities.map((city) => (
+ <div key={city.city} className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5">
+ <div className="flex items-center justify-between gap-2">
+ <p className="text-sm font-semibold text-gray-900 truncate">#{city.rank} {city.city}</p>
+ <p className="text-sm font-black text-gray-900 tabular-nums">{city.totalScore}</p>
+ </div>
+ <p className="mt-1 text-[11px] text-gray-500">
+ {city.participants} athlete{city.participants > 1 ? 's' : ''} · top {city.topAthlete?.pseudo ?? 'n/a'}
+ </p>
+ </div>
+ ))}
+ </div>
+ </div>
+ )}
+ </div>
  )}
 
  {/* Loading skeleton */}
@@ -153,18 +258,16 @@ export default function ClassementPage() {
  </div>
 
  {/* Avatar */}
- <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${
- isMe ? 'bg-blue-600 text-white' : 'bg-gray-900 text-white'
- }`}>
- {entry.pseudo[0]?.toUpperCase() ?? '?'}
- </div>
+ <Link href={`/dashboard/profil/${entry.userId}`} className="flex-shrink-0">
+ <UserAvatar src={entry.profileImageUrl} name={entry.pseudo} size="sm" className={isMe ? 'ring-2 ring-blue-500' : ''} />
+ </Link>
 
  {/* Info */}
  <div className="min-w-0 overflow-hidden">
  <div className="flex items-baseline gap-1.5 min-w-0">
- <span className={`text-sm sm:text-base font-semibold truncate min-w-0 ${isMe ? 'text-blue-600' : 'text-gray-900'}`}>
+ <Link href={`/dashboard/profil/${entry.userId}`} className={`text-sm sm:text-base font-semibold truncate min-w-0 hover:underline ${isMe ? 'text-blue-600' : 'text-gray-900'}`}>
  {entry.pseudo}
- </span>
+ </Link>
  {isMe && (
  <span className="text-[11px] font-bold text-blue-500 flex-shrink-0">vous</span>
  )}
@@ -180,6 +283,7 @@ export default function ClassementPage() {
  <span className="text-base sm:text-lg font-black text-gray-900 tabular-nums truncate block">{entry.score}</span>
  </div>
  <span className="text-[11px] sm:text-xs text-gray-400 truncate block">{entry.unit}</span>
+ <span className="text-[11px] sm:text-xs text-gray-500 truncate block">Elo {entry.elo} · {entry.league}</span>
  </div>
  </div>
  );
@@ -195,12 +299,12 @@ export default function ClassementPage() {
  {data.myEntry.rank}
  </span>
  </div>
- <div className="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-bold flex-shrink-0">
- {data.myEntry.pseudo[0]?.toUpperCase() ?? '?'}
- </div>
+ <Link href={`/dashboard/profil/${data.myEntry.userId}`} className="flex-shrink-0">
+ <UserAvatar src={data.myEntry.profileImageUrl} name={data.myEntry.pseudo} size="sm" className="ring-2 ring-blue-500" />
+ </Link>
  <div className="min-w-0 overflow-hidden">
  <div className="flex items-baseline gap-1.5 min-w-0">
- <span className="text-sm font-semibold text-blue-600 truncate min-w-0">{data.myEntry.pseudo}</span>
+ <Link href={`/dashboard/profil/${data.myEntry.userId}`} className="text-sm font-semibold text-blue-600 truncate min-w-0 hover:underline">{data.myEntry.pseudo}</Link>
  <span className="text-[11px] font-bold text-blue-400 flex-shrink-0">vous</span>
  </div>
  <p className="text-[11px] sm:text-xs text-blue-400 mt-0.5 break-all leading-4 pr-2">
@@ -212,13 +316,14 @@ export default function ClassementPage() {
  <span className="text-base sm:text-lg font-black text-blue-600 tabular-nums truncate block">{data.myEntry.score}</span>
  </div>
  <span className="text-[11px] sm:text-xs text-blue-400 truncate block">{data.myEntry.unit}</span>
+ <span className="text-[11px] sm:text-xs text-blue-500 truncate block">Elo {data.myEntry.elo} · {data.myEntry.league}</span>
  </div>
  </div>
  )}
 
  {/* Footer note */}
  <p className="text-xs text-center text-gray-400 pt-2 pb-6">
- Seules les performances validées par un admin sont comptabilisées.
+ Les ligues et les classements de villes reposent sur les performances validees par la communaute puis confirmees.
  </p>
  </div>
  </div>

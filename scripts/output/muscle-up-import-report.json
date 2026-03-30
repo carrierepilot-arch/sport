@@ -1,0 +1,29 @@
+{
+  "importedAt": "2026-03-29T22:29:15.665Z",
+  "sourceFile": "C:\\Users\\Admin\\Pictures\\Muscul up.pdf",
+  "mainExercise": "Muscle Up",
+  "variations": [
+    "PULL UP",
+    "DEAD HANG",
+    "ISOMETRIC PULL UP",
+    "BAND ASSISTED PULL UP",
+    "ASSISTED PULL UP",
+    "UPSIDE DOWN PULL UP",
+    "BRACHIALIS PULL UP",
+    "REVERSE GRIP PULL UP",
+    "NEUTRAL GRIP PULL UP",
+    "WEIGHTED PULL UP",
+    "CHIN UP",
+    "CLOSE GRIP CHIN UP",
+    "WEIGHTED ONE ARM PULL UP",
+    "BEHIND THE NECK PULL UP",
+    "COMMANDO PULL UP",
+    "JUMPING PULL UP",
+    "CLIMBING MONKEY BARS",
+    "ARCHER PULL UP",
+    "SCAPULA PULL UP",
+    "ONE ARM CHIN UP",
+    "CHIN UP AROUND THE BAR"
+  ],
+  "outputDir": "C:\\Users\\Admin\\sport\\public\\exercise-media\\generated"
+}

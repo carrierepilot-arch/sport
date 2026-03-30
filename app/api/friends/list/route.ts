@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/auth';
+import { getProfileImageUrl } from '@/lib/social';
 
 export async function GET(request: NextRequest) {
  try {
@@ -43,7 +44,7 @@ export async function GET(request: NextRequest) {
  const users = userIds.length
  ? await prisma.user.findMany({
  where: { id: { in: userIds } },
- select: { id: true, pseudo: true, name: true, email: true },
+ select: { id: true, pseudo: true, name: true, email: true, equipmentData: true },
  })
  : [];
  const userMap = new Map(users.map((u) => [u.id, u]));
@@ -56,6 +57,7 @@ export async function GET(request: NextRequest) {
  friendId,
  pseudo: friend?.pseudo ?? friend?.email ?? 'ami',
  nom: friend?.name ?? friend?.email ?? 'Ami',
+ profileImageUrl: getProfileImageUrl(friend?.equipmentData),
  statut: 'accepte' as const,
  };
  });
@@ -65,6 +67,7 @@ export async function GET(request: NextRequest) {
  friendId: r.senderId,
  pseudo: userMap.get(r.senderId)?.pseudo ?? userMap.get(r.senderId)?.email ?? 'ami',
  nom: userMap.get(r.senderId)?.name ?? userMap.get(r.senderId)?.email ?? 'Ami',
+ profileImageUrl: getProfileImageUrl(userMap.get(r.senderId)?.equipmentData),
  statut: 'recu' as const,
  }));
 
@@ -73,6 +76,7 @@ export async function GET(request: NextRequest) {
  friendId: r.receiverId,
  pseudo: userMap.get(r.receiverId)?.pseudo ?? userMap.get(r.receiverId)?.email ?? 'ami',
  nom: userMap.get(r.receiverId)?.name ?? userMap.get(r.receiverId)?.email ?? 'Ami',
+ profileImageUrl: getProfileImageUrl(userMap.get(r.receiverId)?.equipmentData),
  statut: 'en_attente' as const,
  }));
 

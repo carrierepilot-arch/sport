@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/auth';
 import { enforceRequestRateLimit } from '@/lib/request-rate-limit';
+import { decryptMessageContent, encryptMessageContent } from '@/lib/message-crypto';
 
 // GET — get messages for a group (must be a member)
 export async function GET(request: NextRequest) {
@@ -28,7 +29,13 @@ export async function GET(request: NextRequest) {
  take: 100,
  });
 
- return NextResponse.json({ messages, currentUserId: payload.userId });
+ return NextResponse.json({
+ messages: messages.map((message) => ({
+ ...message,
+ content: decryptMessageContent(message.content),
+ })),
+ currentUserId: payload.userId,
+ });
  } catch (error) {
  console.error('Group messages GET error:', error);
  return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
@@ -57,12 +64,13 @@ export async function POST(request: NextRequest) {
  });
  if (!member) return NextResponse.json({ error: 'Non membre du groupe' }, { status: 403 });
 
+ const normalizedContent = content.trim();
  const message = await prisma.groupMessage.create({
- data: { groupId, userId: payload.userId, content: content.trim() },
+ data: { groupId, userId: payload.userId, content: encryptMessageContent(normalizedContent) },
  include: { user: { select: { id: true, pseudo: true, name: true } } },
  });
 
- return NextResponse.json({ message });
+ return NextResponse.json({ message: { ...message, content: normalizedContent } });
  } catch (error) {
  console.error('Group messages POST error:', error);
  return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });

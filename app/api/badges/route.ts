@@ -159,12 +159,62 @@ export async function GET(request: NextRequest) {
  const payload = verifyToken(token);
  if (!payload) return NextResponse.json({ error: 'Token invalide' }, { status: 401 });
 
- const badges = await prisma.badge.findMany({
+ const userId = payload.userId;
+
+ const [user, badges, completedSessions, loginDays] = await Promise.all([
+ prisma.user.findUnique({ where: { id: userId }, select: { level: true, xp: true } }),
+ prisma.badge.findMany({
  where: { userId: payload.userId },
  orderBy: { earnedAt: 'asc' },
- });
+ }),
+ prisma.workoutSession.count({ where: { userId, status: { in: ['completed', 'done'] } } }),
+ prisma.activityLog.findMany({
+ where: { userId, action: 'login' },
+ select: { createdAt: true },
+ orderBy: { createdAt: 'desc' },
+ }),
+ ]);
 
- return NextResponse.json({ badges });
+ const uniqueDays = [...new Set(loginDays.map(l => l.createdAt.toISOString().slice(0, 10)))].sort().reverse();
+ let loginStreak = 0;
+ const today = new Date().toISOString().slice(0, 10);
+ for (let i = 0; i < uniqueDays.length; i++) {
+ const expected = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+ if (uniqueDays[i] === expected) {
+ loginStreak++;
+ } else if (i === 0 && uniqueDays[0] !== today) {
+ const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+ if (uniqueDays[0] === yesterday) {
+ loginStreak++;
+ } else {
+ break;
+ }
+ } else {
+ break;
+ }
+ }
+
+ const xp = user?.xp ?? 0;
+
+ const nextMilestones = {
+ sessions: completedSessions < 100 ? [1, 5, 10, 25, 50, 100].find((n) => n > completedSessions) ?? 100 : 100,
+ streak: loginStreak < 90 ? [7, 14, 30, 60, 90].find((n) => n > loginStreak) ?? 90 : 90,
+ xp: xp < 5000 ? [100, 500, 1000, 5000].find((n) => n > xp) ?? 5000 : 5000,
+ };
+
+ const progress = {
+ unlockedCount: badges.length,
+ totalBadgesAvailable: BADGE_DEFS.length,
+ profile: {
+ level: user?.level ?? 'intermediaire',
+ xp,
+ completedSessions,
+ loginStreak,
+ },
+ nextMilestones,
+ };
+
+ return NextResponse.json({ badges, progress });
  } catch (error) {
  console.error('Badge list error:', error);
  return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });

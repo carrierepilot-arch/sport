@@ -255,7 +255,7 @@ model SpotRegular {
 model Performance {
   id        String   @id @default(cuid())
   userId    String
-  spotId    String
+  spotId    String?
   exercise  String
   score     Float
   unit      String   @default("reps")
@@ -265,7 +265,7 @@ model Performance {
   createdAt DateTime @default(now())
 
   user        User                    @relation(fields: [userId], references: [id])
-  spot        Spot                    @relation(fields: [spotId], references: [id])
+  spot        Spot?                   @relation(fields: [spotId], references: [id])
   validations PerformanceValidation[]
 }
 
@@ -309,6 +309,8 @@ model ExerciseTranslation {
   translatedDescription String?
   gifUrl                String?
   instructionsFr        String?
+  category              String?
+  metadata              Json?
   sourceApi             String   @default("exerciseDB")
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt

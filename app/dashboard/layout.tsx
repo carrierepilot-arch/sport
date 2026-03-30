@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { clearStoredSession, getStoredSession } from '@/lib/clientRuntime';
+import { UserAvatar } from '@/components/UserAvatar';
 
 const PRIMARY_NAV_ITEMS = [
  { href: '/dashboard', label: 'Accueil', icon: 'M3 10.75L12 3l9 7.75M5.25 9.5V20a1 1 0 001 1h4.5v-6.5h2.5V21h4.5a1 1 0 001-1V9.5' },
@@ -44,6 +45,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
  const [isAuthenticated, setIsAuthenticated] = useState(false);
  const [userName, setUserName] = useState('');
  const [userPseudo, setUserPseudo] = useState('');
+ const [userProfileImageUrl, setUserProfileImageUrl] = useState<string | null>(null);
  const [isAdmin, setIsAdmin] = useState(false);
  const [pendingCount, setPendingCount] = useState(0);
  const [unreadMessages, setUnreadMessages] = useState(0);
@@ -59,6 +61,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
    const t = setTimeout(() => {
     setUserName(u.name ?? u.email ?? '');
     setUserPseudo(u.pseudo ?? '');
+    setUserProfileImageUrl(u.profileImageUrl ?? null);
     setIsAdmin(u.isAdmin === true);
    }, 0);
    return () => clearTimeout(t);
@@ -309,9 +312,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
  </div>
  {/* User info */}
  <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-50">
- <div className="w-9 h-9 bg-gray-900 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
- {userName ? userName[0].toUpperCase() : 'U'}
- </div>
+ <UserAvatar src={userProfileImageUrl} name={userName || userPseudo || 'Utilisateur'} size="sm" />
  <div className="min-w-0">
  <p className="text-sm font-semibold text-gray-900 truncate">{userName || 'Utilisateur'}</p>
  <p className="text-xs text-gray-400 truncate">{userPseudo ? `@${userPseudo}` : ''}</p>
@@ -349,7 +350,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
  <div className="space-y-1">
  {visibleSecondaryNavItems.map((item) => {
  const active = item.href === '/dashboard' ? pathname === '/dashboard' : (pathname === item.href || pathname.startsWith(item.href + '/'));
- const isReseau = item.href === '/dashboard/reseau';
+ const isSocial = item.href === '/dashboard/social';
  const isInbox = item.href === '/dashboard/boite-reception';
  return (
  <Link
@@ -366,7 +367,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
  <path strokeLinecap="round" strokeLinejoin="round" d={item.icon} />
  </svg>
  {item.label}
- {isReseau && (pendingCount + unreadMessages) > 0 && (
+ {isSocial && (pendingCount + unreadMessages) > 0 && (
  <span className="ml-auto inline-flex items-center justify-center min-w-[20px] h-5 px-1 text-xs bg-red-500 text-white rounded-full font-bold">
  {(pendingCount + unreadMessages) > 9 ? '9+' : pendingCount + unreadMessages}
  </span>
@@ -469,7 +470,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
  <div className="space-y-0.5">
  {visibleSecondaryNavItems.map((item) => {
  const active = item.href === '/dashboard' ? pathname === '/dashboard' : (pathname === item.href || pathname.startsWith(item.href + '/'));
- const isReseau = item.href === '/dashboard/reseau';
+ const isSocial = item.href === '/dashboard/social';
  const isInbox = item.href === '/dashboard/boite-reception';
  return (
  <Link
@@ -488,7 +489,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
  {!sidebarCollapsed && (
  <>
  <span className="truncate">{item.label}</span>
- {isReseau && (pendingCount + unreadMessages) > 0 && (
+ {isSocial && (pendingCount + unreadMessages) > 0 && (
  <span className="ml-auto inline-flex items-center justify-center min-w-[20px] h-5 px-1 text-xs bg-red-500 text-white rounded-full font-bold">
  {(pendingCount + unreadMessages) > 9 ? '9+' : pendingCount + unreadMessages}
  </span>
@@ -527,9 +528,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
  {!sidebarCollapsed ? (
  <div className="border-t border-gray-100 p-4 flex-shrink-0">
  <div className="flex items-center gap-3 mb-3">
- <div className="w-8 h-8 bg-gray-900 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
- {userName ? userName[0].toUpperCase() : 'U'}
- </div>
+ <UserAvatar src={userProfileImageUrl} name={userName || userPseudo || 'Utilisateur'} size="sm" />
  <div className="min-w-0">
  <p className="text-sm font-semibold text-gray-900 truncate">{userName || 'Utilisateur'}</p>
  <p className="text-xs text-gray-400 truncate">{userPseudo ? `@${userPseudo}` : ''}</p>

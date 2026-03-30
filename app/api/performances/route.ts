@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/auth';
 
-const VALID_EXERCISES = ['tractions', 'pompes', 'dips', 'squats', 'tractions_lestees', 'dips_lestes'];
+const VALID_EXERCISES = ['tractions', 'pompes', 'dips', 'squats', 'tractions_lestees', 'dips_lestes', 'muscle_ups'];
 const EXERCISE_UNIT: Record<string, string> = {
  tractions: 'reps', pompes: 'reps', dips: 'reps', squats: 'reps',
- tractions_lestees: 'kg', dips_lestes: 'kg',
+ tractions_lestees: 'kg', dips_lestes: 'kg', muscle_ups: 'reps',
 };
 
 // GET — leaderboard for a spot
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
  let performances: Array<{
  id: string;
  userId: string;
- spotId: string;
+ spotId: string | null;
  exercise: string;
  score: number;
  unit: string;
@@ -47,6 +47,7 @@ export async function GET(request: NextRequest) {
  spotId,
  OR: [
  { status: 'validated' },
+ { status: 'pending' },
  { userId: payload.userId },
  ],
  },
@@ -62,6 +63,7 @@ export async function GET(request: NextRequest) {
  spotId,
  OR: [
  { status: 'validated' },
+ { status: 'pending' },
  { userId: payload.userId },
  ],
  },
@@ -106,10 +108,10 @@ export async function POST(request: NextRequest) {
  const payload = verifyToken(token);
  if (!payload) return NextResponse.json({ error: 'Token invalide' }, { status: 401 });
 
- const { spotId, exercise, score } = await request.json();
+ const { spotId, exercise, score, visibility } = await request.json();
 
- if (!spotId || !exercise || score === undefined || score === null) {
- return NextResponse.json({ error: 'spotId, exercise et score requis' }, { status: 400 });
+ if (!exercise || score === undefined || score === null) {
+ return NextResponse.json({ error: 'exercise et score requis' }, { status: 400 });
  }
  if (!VALID_EXERCISES.includes(exercise)) {
  return NextResponse.json({ error: 'Exercice invalide' }, { status: 400 });
@@ -119,17 +121,22 @@ export async function POST(request: NextRequest) {
  return NextResponse.json({ error: 'Score invalide (doit être > 0)' }, { status: 400 });
  }
 
- const spot = await prisma.spot.findUnique({ where: { id: spotId } });
+ const resolvedSpotId: string | null = spotId ?? null;
+ if (resolvedSpotId) {
+ const spot = await prisma.spot.findUnique({ where: { id: resolvedSpotId } });
  if (!spot) return NextResponse.json({ error: 'Spot introuvable' }, { status: 404 });
+ }
+
+ const performanceVisibility = visibility === 'private' ? 'private' : 'public';
 
  const performance = await prisma.performance.create({
  data: {
  userId: payload.userId,
- spotId,
+ ...(resolvedSpotId ? { spotId: resolvedSpotId } : {}),
  exercise,
  score: scoreNum,
  unit: EXERCISE_UNIT[exercise] ?? 'reps',
- status: 'pending',
+ status: performanceVisibility === 'private' ? 'private' : 'pending',
  },
  include: {
  user: { select: { id: true, pseudo: true, name: true } },
@@ -137,7 +144,7 @@ export async function POST(request: NextRequest) {
  },
  });
 
- return NextResponse.json({ performance });
+ return NextResponse.json({ performance, visibility: performanceVisibility });
  } catch (error) {
  console.error('Performance POST error:', error);
  return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });

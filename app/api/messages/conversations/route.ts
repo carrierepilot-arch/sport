@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/auth';
+import { getProfileImageUrl } from '@/lib/social';
+import { buildMessagePreview } from '@/lib/message-crypto';
 
 export async function GET(request: NextRequest) {
  try {
@@ -37,14 +39,14 @@ export async function GET(request: NextRequest) {
  const users = friendIds.length
  ? await prisma.user.findMany({
  where: { id: { in: friendIds } },
- select: { id: true, pseudo: true, name: true, email: true },
+ select: { id: true, pseudo: true, name: true, email: true, equipmentData: true },
  })
  : [];
  const userMap = new Map(users.map((u) => [u.id, u]));
 
  // Dédupliquer par interlocuteur, garder le dernier message
  const convMap = new Map<string, {
- friendId: string; pseudo: string; nom: string; dernier: string; heure: string; nonLu: number;
+ friendId: string; pseudo: string; nom: string; dernier: string; heure: string; nonLu: number; profileImageUrl: string | null;
  }>();
 
  for (const msg of messages) {
@@ -60,9 +62,10 @@ export async function GET(request: NextRequest) {
  friendId,
  pseudo,
  nom,
- dernier: msg.content.slice(0, 50) + (msg.content.length > 50 ? '...' : ''),
+ dernier: buildMessagePreview(msg.content),
  heure: new Date(msg.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
  nonLu,
+ profileImageUrl: getProfileImageUrl(friend?.equipmentData),
  });
  }
  }

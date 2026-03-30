@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdminPermission } from '@/lib/admin-auth';
+import { getProfileImageUrl, getProfileVisibility } from '@/lib/social';
 
 export async function GET(request: NextRequest) {
  try {
@@ -16,6 +17,7 @@ export async function GET(request: NextRequest) {
  adminLevel: number;
  suspended: boolean;
  level: string;
+ equipmentData?: unknown;
  createdAt: Date;
  updatedAt: Date;
  sessions: { lastSeen: Date; browser: string | null; device: string | null; ipAddress: string | null; createdAt: Date }[];
@@ -33,6 +35,7 @@ export async function GET(request: NextRequest) {
  adminLevel: true,
  suspended: true,
  level: true,
+ equipmentData: true,
  createdAt: true,
  updatedAt: true,
  sessions: {
@@ -60,6 +63,7 @@ export async function GET(request: NextRequest) {
  name: true,
  pseudo: true,
  isAdmin: true,
+ equipmentData: true,
  createdAt: true,
  sessions: {
  orderBy: { lastSeen: 'desc' },
@@ -87,7 +91,13 @@ export async function GET(request: NextRequest) {
  }));
  }
 
- return NextResponse.json({ users });
+ const usersWithProfile = users.map((user) => ({
+ ...user,
+ profileImageUrl: getProfileImageUrl(user.equipmentData),
+ profileVisibility: getProfileVisibility(user.equipmentData),
+ }));
+
+ return NextResponse.json({ users: usersWithProfile });
  } catch (error) {
  console.error('Admin users error:', error);
  return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });

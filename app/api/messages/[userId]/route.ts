@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/auth';
+import { decryptMessageContent } from '@/lib/message-crypto';
 
 export async function GET(
  request: NextRequest,
@@ -35,7 +36,7 @@ export async function GET(
  const result = messages.map((m) => ({
  id: m.id,
  from: m.senderId === payload.userId ? ('me' as const) : ('them' as const),
- text: m.content,
+ text: decryptMessageContent(m.content),
  heure: new Date(m.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
  }));
 

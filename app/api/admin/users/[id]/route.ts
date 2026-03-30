@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { logAdminAction, requireAdminPermission } from '@/lib/admin-auth';
+import { getProfileImageUrl, withProfileImageUrl, withoutProfileImageUrl } from '@/lib/social';
+import type { Prisma } from '@/lib/generated/prisma/client';
 
 // PATCH — suspend/unsuspend a user OR toggle admin
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -11,8 +13,60 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
  const { id } = await params;
  const body = await request.json();
 
- const target = await prisma.user.findUnique({ where: { id } });
+ const target = await prisma.user.findUnique({ where: { id }, select: { id: true, email: true, isAdmin: true, equipmentData: true } });
  if (!target) return NextResponse.json({ error: 'Utilisateur introuvable' }, { status: 404 });
+
+ // ── Moderate identity/photo ──
+ if (
+	 typeof body.pseudo === 'string' ||
+	 typeof body.name === 'string' ||
+	 typeof body.profileImageUrl === 'string' ||
+	 typeof body.removeProfileImage === 'boolean'
+ ) {
+	 const data: Prisma.UserUpdateInput = {};
+	 if (typeof body.pseudo === 'string') {
+		 const pseudo = body.pseudo.trim();
+		 if (!pseudo) return NextResponse.json({ error: 'Pseudo invalide' }, { status: 400 });
+		 const duplicate = await prisma.user.findFirst({
+			 where: {
+				 id: { not: id },
+				 pseudo: { equals: pseudo, mode: 'insensitive' },
+			 },
+			 select: { id: true },
+		 });
+		 if (duplicate) return NextResponse.json({ error: 'Pseudo deja utilise' }, { status: 409 });
+		 data.pseudo = pseudo;
+	 }
+	 if (typeof body.name === 'string') {
+		 const name = body.name.trim();
+		 data.name = name || null;
+	 }
+	 if (body.removeProfileImage === true) {
+		 data.equipmentData = withoutProfileImageUrl(target.equipmentData) as Prisma.InputJsonValue;
+	 } else if (typeof body.profileImageUrl === 'string') {
+		 const url = body.profileImageUrl.trim();
+		 if (!url) {
+			 data.equipmentData = withoutProfileImageUrl(target.equipmentData) as Prisma.InputJsonValue;
+		 } else {
+			 data.equipmentData = withProfileImageUrl(target.equipmentData, url) as Prisma.InputJsonValue;
+		 }
+	 }
+
+	 const updated = await prisma.user.update({
+		 where: { id },
+		 data,
+		 select: { id: true, email: true, name: true, pseudo: true, equipmentData: true, isAdmin: true, adminLevel: true, suspended: true },
+	 });
+
+	 await logAdminAction(admin.userId, 'admin.user.profile_moderation', `user=${target.email} pseudo=${String(updated.pseudo)} name=${String(updated.name)} removePhoto=${String(body.removeProfileImage === true)}`);
+
+	 return NextResponse.json({
+		 user: {
+			 ...updated,
+			 profileImageUrl: getProfileImageUrl(updated.equipmentData),
+		 },
+	 });
+ }
 
  // ── Toggle isAdmin ──
  if (typeof body.isAdmin === 'boolean') {

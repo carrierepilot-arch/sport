@@ -53,6 +53,9 @@ export async function POST(request: NextRequest) {
  if (perf.userId !== payload.userId) {
  return NextResponse.json({ error: 'Vous ne pouvez envoyer des demandes que pour vos propres performances' }, { status: 403 });
  }
+ if (perf.status === 'private') {
+ return NextResponse.json({ error: 'Publiez cette performance en public avant de lancer une validation communautaire' }, { status: 400 });
+ }
 
  // Upsert: only create pending if no record exists yet (don't override accepted/rejected)
  const results = await Promise.all(
@@ -79,6 +82,9 @@ export async function POST(request: NextRequest) {
  if (!perf) return NextResponse.json({ error: 'Performance introuvable' }, { status: 404 });
  if (perf.userId === payload.userId) {
  return NextResponse.json({ error: 'Vous ne pouvez pas valider votre propre performance' }, { status: 403 });
+ }
+ if (perf.status === 'private') {
+ return NextResponse.json({ error: 'Cette performance est privée' }, { status: 400 });
  }
 
  const newStatus = isValid ? 'accepted' : 'rejected';

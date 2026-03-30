@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getSupabaseAdmin, SUPABASE_STORAGE_BUCKET } from '@/lib/supabase-admin';
+import { list, del as blobDel } from '@vercel/blob';
 import { logAdminAction, requireAdminPermission } from '@/lib/admin-auth';
+import { checkRateLimit } from '@/lib/simple-rate-limit';
 
 const DEFAULT_STORAGE_QUOTA_BYTES = 5 * 1024 * 1024 * 1024; // 5 GB
 
@@ -11,44 +12,64 @@ function parseQuotaBytes(): number {
  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_STORAGE_QUOTA_BYTES;
 }
 
-async function deleteStoredVideo(path: string | null | undefined) {
- if (!path) return;
+async function deleteStoredVideo(
+ adminUserId: string,
+ performanceId: string,
+ videoUrl: string | null | undefined,
+) {
+ if (!videoUrl) return;
  try {
- const supabase = getSupabaseAdmin();
- await supabase.storage.from(SUPABASE_STORAGE_BUCKET).remove([path]);
+ await validateBlobVideoUrl(videoUrl);
+ } catch {
+ await logAdminAction(
+ adminUserId,
+ 'admin.performance.video_delete_rejected',
+ `performanceId=${performanceId} reason=invalid_blob_url`,
+ );
+ return;
+ }
+
+ try {
+ await blobDel(videoUrl);
  } catch {
  // Non-blocking: DB cleanup should still happen even if file is already removed.
  }
 }
 
-async function getVideoStorageStats(paths: string[]) {
- let usedBytes = 0;
- const supabase = getSupabaseAdmin();
-
- await Promise.all(paths.map(async (path) => {
- const [folder, ...rest] = path.split('/');
- const fileName = rest.join('/');
- if (!folder || !fileName) return;
-
+async function validateBlobVideoUrl(videoUrl: string): Promise<void> {
  try {
- const { data } = await supabase.storage.from(SUPABASE_STORAGE_BUCKET).list(folder, {
- search: fileName,
- limit: 1,
- });
- const file = data?.[0];
- if (file?.metadata && typeof file.metadata.size === 'number') {
- usedBytes += file.metadata.size;
+ const parsed = new URL(videoUrl);
+ const validProtocol = parsed.protocol === 'https:';
+ const validHost = parsed.hostname.endsWith('.blob.vercel-storage.com') || parsed.hostname === 'blob.vercel-storage.com';
+ const validPath = parsed.pathname.startsWith('/performances/');
+ if (!validProtocol || !validHost || !validPath) {
+ throw new Error('URL blob non autorisee');
  }
  } catch {
- // Ignore inaccessible files.
+ throw new Error('URL blob invalide');
  }
- }));
+}
+
+async function getVideoStorageStats() {
+ let usedBytes = 0;
+ let fileCount = 0;
+ let cursor: string | undefined;
+
+ do {
+  const page = await list({ prefix: 'performances/', limit: 1000, cursor });
+  for (const b of page.blobs) {
+   usedBytes += b.size;
+   fileCount += 1;
+  }
+  cursor = page.hasMore ? page.cursor : undefined;
+ } while (cursor);
 
  const quotaBytes = parseQuotaBytes();
  return {
- usedBytes,
- quotaBytes,
- remainingBytes: Math.max(0, quotaBytes - usedBytes),
+  usedBytes,
+  quotaBytes,
+  remainingBytes: Math.max(0, quotaBytes - usedBytes),
+  fileCount,
  };
 }
 
@@ -56,6 +77,20 @@ async function getVideoStorageStats(paths: string[]) {
 export async function GET(request: NextRequest) {
  const admin = await requireAdminPermission(request, 'performances:read');
  if (!admin) return NextResponse.json({ error: 'Non autorisé' }, { status: 403 });
+
+ const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+ const rate = checkRateLimit(`admin-performances:${admin.userId}:${ip}`, 30, 60_000);
+ if (!rate.ok) {
+ await logAdminAction(
+ admin.userId,
+ 'admin.performance.rate_limited',
+ `ip=${ip} retryAfter=${rate.retryAfterSec}s`,
+ );
+ return NextResponse.json(
+ { error: 'Trop de requêtes. Réessayez dans quelques secondes.' },
+ { status: 429, headers: { 'Retry-After': String(rate.retryAfterSec) } },
+ );
+ }
 
  try {
  try {
@@ -69,17 +104,9 @@ export async function GET(request: NextRequest) {
  take: 200,
  });
 
- const supabase = getSupabaseAdmin();
- const signedPerformances = await Promise.all(performances.map(async (p) => {
- if (!p.videoStoragePath) return p;
- const { data } = await supabase.storage.from(SUPABASE_STORAGE_BUCKET).createSignedUrl(p.videoStoragePath, 60 * 10);
- return { ...p, videoUrl: data?.signedUrl || p.videoUrl };
- }));
+        const storage = await getVideoStorageStats();
 
- const videoPaths = performances.map((p) => p.videoStoragePath).filter((u): u is string => !!u);
- const storage = await getVideoStorageStats(videoPaths);
-
- return NextResponse.json({ performances: signedPerformances, storage: { ...storage, fileCount: videoPaths.length } });
+ return NextResponse.json({ performances, storage });
  } catch {
  const legacyPerformances = await prisma.performance.findMany({
  select: {
@@ -107,7 +134,7 @@ export async function GET(request: NextRequest) {
  }
  } catch (error) {
  console.error('Admin performances GET:', error);
- return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
+ return NextResponse.json({ error: 'Erreur serveur interne' }, { status: 500 });
  }
 }
 
@@ -137,7 +164,7 @@ export async function PUT(request: NextRequest) {
  return NextResponse.json({ performance: updated });
  } catch (error) {
  console.error('Admin performances PUT:', error);
- return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
+ return NextResponse.json({ error: 'Erreur serveur interne' }, { status: 500 });
  }
 }
 
@@ -165,7 +192,7 @@ export async function DELETE(request: NextRequest) {
  if (!performance) return NextResponse.json({ error: 'Performance introuvable' }, { status: 404 });
 
  if (videoOnly) {
- if (performance.videoStoragePath) await deleteStoredVideo(performance.videoStoragePath);
+ if (performance.videoUrl) await deleteStoredVideo(admin.userId, performanceId, performance.videoUrl);
  const updated = await prisma.performance.update({
  where: { id: performanceId },
  data: performance.videoStoragePath !== undefined ? { videoUrl: null, videoStoragePath: null } : { videoUrl: null },
@@ -174,12 +201,12 @@ export async function DELETE(request: NextRequest) {
  return NextResponse.json({ success: true, performance: updated });
  }
 
- if (performance.videoStoragePath) await deleteStoredVideo(performance.videoStoragePath);
+ if (performance.videoUrl) await deleteStoredVideo(admin.userId, performanceId, performance.videoUrl);
  await prisma.performance.delete({ where: { id: performanceId } });
  await logAdminAction(admin.userId, 'admin.performance.delete', `performanceId=${performanceId}`);
  return NextResponse.json({ success: true });
  } catch (error) {
  console.error('Admin performances DELETE:', error);
- return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
+ return NextResponse.json({ error: 'Erreur serveur interne' }, { status: 500 });
  }
 }

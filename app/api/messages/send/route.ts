@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/auth';
 import { enforceRequestRateLimit } from '@/lib/request-rate-limit';
+import { encryptMessageContent } from '@/lib/message-crypto';
 
 export async function POST(request: NextRequest) {
  try {
@@ -20,8 +21,9 @@ export async function POST(request: NextRequest) {
  return NextResponse.json({ error: 'Paramètres manquants' }, { status: 400 });
  }
 
+ const normalizedContent = content.trim();
  const msg = await prisma.message.create({
- data: { senderId: payload.userId, receiverId, content: content.trim() },
+ data: { senderId: payload.userId, receiverId, content: encryptMessageContent(normalizedContent) },
  });
 
  await prisma.activityLog.create({
@@ -33,7 +35,7 @@ export async function POST(request: NextRequest) {
  message: {
  id: msg.id,
  from: 'me' as const,
- text: msg.content,
+ text: normalizedContent,
  heure: new Date(msg.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
  },
  });

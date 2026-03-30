@@ -3,8 +3,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
-const ALLOWED_TYPES = ['video/mp4', 'video/webm', 'video/quicktime'];
-const MAX_SIZE = 80 * 1024 * 1024; // 80 MB
+const ALLOWED_TYPES = ['video/mp4', 'video/webm', 'video/quicktime', 'application/zip'];
+const MAX_SIZE = 200 * 1024 * 1024; // 200 MB
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
  // The authorization header is sent by the browser on the token-generation step.

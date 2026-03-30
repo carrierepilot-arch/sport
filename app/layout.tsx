@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import OfflineRuntime from "./components/OfflineRuntime";
@@ -33,8 +33,14 @@ export const metadata: Metadata = {
  icon: "/icon-192.svg",
  apple: "/icon-192.svg",
  },
+};
+
+export const viewport: Viewport = {
+ width: "device-width",
+ initialScale: 1,
+ viewportFit: "cover",
+ userScalable: false,
  themeColor: "#000000",
- viewport: "width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no",
 };
 
 export default function RootLayout({
@@ -44,14 +50,23 @@ export default function RootLayout({
 }>) {
  return (
  <html
- lang="en"
- className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+	 lang="en"
+	 className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
  >
- <body className="min-h-full flex flex-col ios-screen">
- <OfflineRuntime />
- <PWARegister />
- {children}
- </body>
+	 <body className="min-h-full flex flex-col ios-screen">
+		 <OfflineRuntime />
+		 <PWARegister />
+		 <header className="w-full flex flex-col items-center py-6 select-none">
+			 <img
+				 src="/logo-levelflow.jpg"
+				 alt="Levelflow logo"
+				 className="w-16 h-16 rounded-full shadow-md mb-2 object-cover"
+				 style={{ background: '#fff' }}
+			 />
+			 <span className="text-xl font-extrabold tracking-tight text-gray-900">Levelflow</span>
+		 </header>
+		 {children}
+	 </body>
  </html>
  );
 }

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/auth';
+import { getProfileImageUrl, getProfileVisibility, withProfileVisibility } from '@/lib/social';
+import type { Prisma } from '@/lib/generated/prisma/client';
 
 export async function PATCH(request: NextRequest) {
  try {
@@ -12,7 +14,7 @@ export async function PATCH(request: NextRequest) {
  if (!payload) return NextResponse.json({ error: 'Token invalide' }, { status: 401 });
 
  const body = await request.json();
- const { pseudo, name, level, levelTestData } = body;
+ const { pseudo, name, level, levelTestData, profileVisibility } = body;
 
  // Valider que le pseudo n'est pas déjà pris par un autre utilisateur
  if (pseudo?.trim()) {
@@ -33,12 +35,26 @@ export async function PATCH(request: NextRequest) {
  if (level && ['debutant', 'intermediaire', 'elite'].includes(level)) data.level = level;
  if (levelTestData !== undefined) data.levelTestData = levelTestData;
 
+ if (profileVisibility !== undefined && profileVisibility !== 'public' && profileVisibility !== 'private') {
+ return NextResponse.json({ error: 'Visibilite de profil invalide' }, { status: 400 });
+ }
+
+ const currentUser = await prisma.user.findUnique({
+ where: { id: payload.userId },
+ select: { equipmentData: true },
+ });
+ if (!currentUser) return NextResponse.json({ error: 'Utilisateur introuvable' }, { status: 404 });
+
+ if (profileVisibility === 'public' || profileVisibility === 'private') {
+ data.equipmentData = withProfileVisibility(currentUser.equipmentData, profileVisibility) as Prisma.InputJsonValue;
+ }
+
  let updated;
  try {
  updated = await prisma.user.update({
  where: { id: payload.userId },
  data,
- select: { id: true, email: true, name: true, pseudo: true, isAdmin: true, level: true },
+ select: { id: true, email: true, name: true, pseudo: true, isAdmin: true, level: true, equipmentData: true },
  });
  } catch {
  const fallbackData = { ...data };
@@ -46,11 +62,18 @@ export async function PATCH(request: NextRequest) {
  updated = await prisma.user.update({
  where: { id: payload.userId },
  data: fallbackData,
- select: { id: true, email: true, name: true, pseudo: true, isAdmin: true, level: true },
+ select: { id: true, email: true, name: true, pseudo: true, isAdmin: true, level: true, equipmentData: true },
  });
  }
 
- return NextResponse.json({ success: true, user: updated });
+ return NextResponse.json({
+ success: true,
+ user: {
+ ...updated,
+ profileImageUrl: getProfileImageUrl(updated.equipmentData),
+ profileVisibility: getProfileVisibility(updated.equipmentData),
+ },
+ });
  } catch (error) {
  console.error('Update user error:', error);
  return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
