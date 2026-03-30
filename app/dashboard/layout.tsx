@@ -279,7 +279,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
  <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
  </svg>
  </button>
- <Link href="/dashboard" className="text-lg font-black tracking-tight text-gray-900">SPORT</Link>
+ <Link href="/dashboard">
+ <img src="/logo-levelflow.jpg" alt="Levelflow" className="h-7 w-auto object-contain" />
+ </Link>
  {(pendingCount + unreadMessages) > 0 && (
  <span className="ml-auto inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs bg-red-500 text-white rounded-full font-bold">
  {(pendingCount + unreadMessages) > 9 ? '9+' : pendingCount + unreadMessages}
@@ -299,7 +301,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
  <aside className="relative w-72 max-w-[85vw] bg-white/95 backdrop-blur-md flex flex-col h-full shadow-2xl">
  {/* Header */}
  <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
- <Link href="/dashboard" className="text-xl font-black tracking-tight text-gray-900">SPORT</Link>
+ <Link href="/dashboard">
+ <img src="/logo-levelflow.jpg" alt="Levelflow" className="h-8 w-auto object-contain" />
+ </Link>
  <button
  onClick={() => setDrawerOpen(false)}
  className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
@@ -428,8 +432,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
  </svg>
  </button>
  {!sidebarCollapsed && (
- <Link href="/dashboard" className="text-xl font-black tracking-tight text-gray-900 whitespace-nowrap">
- SPORT
+ <Link href="/dashboard">
+ <img src="/logo-levelflow.jpg" alt="Levelflow" className="h-7 w-auto object-contain" />
  </Link>
  )}
  </div>

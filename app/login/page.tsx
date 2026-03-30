@@ -86,7 +86,9 @@ export default function LoginPage() {
  <div className="ios-card p-6 sm:p-8">
  {/* Header */}
  <div className="text-center mb-8">
- <Link href="/" className="inline-block text-3xl font-black tracking-tight text-gray-900 mb-2 hover:text-sky-600 transition">SPORT</Link>
+ <Link href="/" className="inline-flex justify-center mb-4">
+ <img src="/logo-levelflow.jpg" alt="Levelflow" className="h-14 w-auto object-contain" />
+ </Link>
  <p className="text-gray-500">Retrouvez vos entrainements et votre progression en un coup d'oeil</p>
  </div>
 

@@ -5,7 +5,9 @@ export default function Home() {
  <div className="ios-screen min-h-screen text-gray-900 flex flex-col">
  {/* NAV */}
  <nav className="sticky top-0 z-20 ios-nav-glass flex justify-between items-center px-4 sm:px-8 py-4">
- <span className="text-2xl font-black tracking-tight text-gray-900">SPORT</span>
+ <Link href="/">
+ <img src="/logo-levelflow.jpg" alt="Levelflow" className="h-9 w-auto object-contain" />
+ </Link>
  <div className="flex gap-2 sm:gap-3">
  <Link href="/login" className="px-4 sm:px-5 py-2 text-sm font-semibold text-gray-700 border border-gray-300 rounded-full hover:bg-white transition">
  Se connecter
