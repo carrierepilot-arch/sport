@@ -87,7 +87,7 @@ export default function LoginPage() {
  {/* Header */}
  <div className="text-center mb-8">
  <Link href="/" className="inline-flex justify-center mb-4">
- <img src="/logo-levelflow.jpg" alt="Levelflow" className="h-14 w-auto object-contain" />
+ <img src="/logo-levelflow.png" alt="Levelflow" className="h-14 w-auto object-contain" />
  </Link>
  <p className="text-gray-500">Retrouvez vos entrainements et votre progression en un coup d'oeil</p>
  </div>

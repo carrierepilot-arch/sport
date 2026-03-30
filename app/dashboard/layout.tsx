@@ -280,7 +280,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
  </svg>
  </button>
  <Link href="/dashboard">
- <img src="/logo-levelflow.jpg" alt="Levelflow" className="h-7 w-auto object-contain" />
+ <img src="/logo-levelflow.png" alt="Levelflow" className="h-7 w-auto object-contain" />
  </Link>
  {(pendingCount + unreadMessages) > 0 && (
  <span className="ml-auto inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs bg-red-500 text-white rounded-full font-bold">
@@ -302,7 +302,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
  {/* Header */}
  <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
  <Link href="/dashboard">
- <img src="/logo-levelflow.jpg" alt="Levelflow" className="h-8 w-auto object-contain" />
+ <img src="/logo-levelflow.png" alt="Levelflow" className="h-8 w-auto object-contain" />
  </Link>
  <button
  onClick={() => setDrawerOpen(false)}
