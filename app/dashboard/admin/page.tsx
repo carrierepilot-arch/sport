@@ -1987,7 +1987,8 @@ export default function AdminPage() {
  </div>
  <div className="divide-y divide-gray-50">
  {performances.filter(p => p.videoUrl).map(p => (
- <div key={`vid-${p.id}`} className="px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center gap-3">
+ <div key={`vid-${p.id}`} className="px-4 sm:px-6 py-4 flex flex-col gap-3">
+ <div className="flex flex-col sm:flex-row sm:items-start gap-3">
  <div className="flex-1 min-w-0">
  <p className="text-sm font-medium text-gray-900 truncate">
  {p.user.pseudo ? `@${p.user.pseudo}` : p.user.name ?? p.user.email} — {p.exercise}
@@ -1997,7 +1998,7 @@ export default function AdminPage() {
  <div className="flex items-center gap-2 flex-wrap sm:justify-end">
  <a href={p.videoUrl!} target="_blank" rel="noopener noreferrer"
  className="px-3 py-1.5 text-xs bg-blue-50 text-blue-600 rounded-lg font-medium hover:bg-blue-100">
- {isZipProofUrl(p.videoUrl) ? ' Telecharger ZIP' : ' Voir video'}
+ {isZipProofUrl(p.videoUrl) ? 'Telecharger ZIP' : 'Ouvrir video'}
  </a>
  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
  p.status === 'validated' ? 'bg-green-100 text-green-700' :
@@ -2026,6 +2027,15 @@ export default function AdminPage() {
  Supprimer video
  </button>
  </div>
+ </div>
+ {!isZipProofUrl(p.videoUrl) && (
+ <video
+ src={p.videoUrl!}
+ controls
+ preload="metadata"
+ className="w-full max-h-64 rounded-xl border border-gray-200 bg-black object-contain"
+ />
+ )}
  </div>
  ))}
  </div>

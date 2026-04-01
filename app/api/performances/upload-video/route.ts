@@ -65,3 +65,52 @@ export async function POST(request: NextRequest) {
  return NextResponse.json({ error: `Erreur upload: ${msg}` }, { status: 500 });
  }
 }
+
+// PATCH — confirm videoUrl after client-side blob upload (fallback for onUploadCompleted webhook)
+export async function PATCH(request: NextRequest) {
+ try {
+ const token = request.headers.get('authorization')?.replace('Bearer ', '');
+ if (!token) return NextResponse.json({ error: 'Non authentifie' }, { status: 401 });
+ const payload = verifyToken(token);
+ if (!payload) return NextResponse.json({ error: 'Token invalide' }, { status: 401 });
+
+ const { performanceId, videoUrl, videoStoragePath } = await request.json() as {
+ performanceId?: string;
+ videoUrl?: string;
+ videoStoragePath?: string;
+ };
+
+ if (!performanceId || !videoUrl) {
+ return NextResponse.json({ error: 'performanceId et videoUrl requis' }, { status: 400 });
+ }
+
+ // Validate the URL belongs to Vercel Blob (security)
+ try {
+ const parsed = new URL(videoUrl);
+ if (!parsed.hostname.endsWith('.blob.vercel-storage.com')) {
+ return NextResponse.json({ error: 'URL de stockage invalide' }, { status: 400 });
+ }
+ } catch {
+ return NextResponse.json({ error: 'URL invalide' }, { status: 400 });
+ }
+
+ const performance = await prisma.performance.findUnique({ where: { id: performanceId } });
+ if (!performance) return NextResponse.json({ error: 'Performance introuvable' }, { status: 404 });
+ if (performance.userId !== payload.userId) {
+ return NextResponse.json({ error: 'Non autorise' }, { status: 403 });
+ }
+
+ await prisma.performance.update({
+ where: { id: performanceId },
+ data: {
+ videoUrl,
+ ...(videoStoragePath ? { videoStoragePath } : {}),
+ },
+ });
+
+ return NextResponse.json({ ok: true });
+ } catch (error) {
+ const msg = error instanceof Error ? error.message : String(error);
+ return NextResponse.json({ error: `Erreur: ${msg}` }, { status: 500 });
+ }
+}

@@ -1056,7 +1056,7 @@ export default function SocialPage() {
           const zipped = await zipVideoFile(compressed, (pct) => setPerfModalVideoProgress(pct));
           const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
           const { upload } = await import('@vercel/blob/client');
-          await upload(
+          const blob = await upload(
             `performances/${performanceId}/${Date.now()}-${zipped.name}`,
             zipped,
             {
@@ -1066,6 +1066,17 @@ export default function SocialPage() {
               headers: token ? { Authorization: `Bearer ${token}` } : {},
             },
           );
+          // Explicitly persist the video URL in the DB from the client side
+          // (does not rely solely on the onUploadCompleted webhook which can be unreliable)
+          try {
+            await fetch('/api/performances/upload-video', {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+              body: JSON.stringify({ performanceId, videoUrl: blob.url, videoStoragePath: blob.pathname }),
+            });
+          } catch {
+            // PATCH failed — onUploadCompleted webhook is the fallback
+          }
         } catch {
           // Video upload failed but performance record is saved — continue silently
         }
