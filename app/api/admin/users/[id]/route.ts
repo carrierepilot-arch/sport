@@ -4,11 +4,25 @@ import { logAdminAction, requireAdminPermission } from '@/lib/admin-auth';
 import { getProfileImageUrl, withProfileImageUrl, withoutProfileImageUrl } from '@/lib/social';
 import type { Prisma } from '@/lib/generated/prisma/client';
 
+// Helper: masquer l'email si admin < niveau 3
+function sanitizeUser(user: any, adminLevel: number) {
+ if (adminLevel < 3) {
+ const { email, ...rest } = user;
+ return rest;
+ }
+ return user;
+}
+
 // PATCH — suspend/unsuspend a user OR toggle admin
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
  try {
  const admin = await requireAdminPermission(request, 'users:write');
  if (!admin) return NextResponse.json({ error: 'Accès refusé' }, { status: 403 });
+
+ // Seulement les admins niveau 3 peuvent effectuer ces opérations
+ if (admin.adminLevel < 3) {
+ return NextResponse.json({ error: 'Vous n\'avez pas l\'accès à cette opération (niveau 3 requis)' }, { status: 403 });
+ }
 
  const { id } = await params;
  const body = await request.json();
@@ -61,10 +75,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 	 await logAdminAction(admin.userId, 'admin.user.profile_moderation', `user=${target.email} pseudo=${String(updated.pseudo)} name=${String(updated.name)} removePhoto=${String(body.removeProfileImage === true)}`);
 
 	 return NextResponse.json({
-		 user: {
+		 user: sanitizeUser({
 			 ...updated,
 			 profileImageUrl: getProfileImageUrl(updated.equipmentData),
-		 },
+		 }, admin.adminLevel),
 	 });
  }
 
@@ -79,7 +93,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
  select: { id: true, email: true, isAdmin: true, adminLevel: true, suspended: true },
  });
  await logAdminAction(admin.userId, 'admin.user.admin_toggle', `${target.email} -> isAdmin=${String(body.isAdmin)}`);
- return NextResponse.json({ user: updated });
+ return NextResponse.json({ user: sanitizeUser(updated, admin.adminLevel) });
  }
 
  // ── Change admin level ──
@@ -97,7 +111,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
  select: { id: true, email: true, isAdmin: true, adminLevel: true, suspended: true },
  });
  await logAdminAction(admin.userId, 'admin.user.level_change', `${target.email} -> adminLevel=${String(level)}`);
- return NextResponse.json({ user: updated });
+ return NextResponse.json({ user: sanitizeUser(updated, admin.adminLevel) });
  }
 
  // ── Toggle suspended ──
@@ -114,7 +128,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
  select: { id: true, email: true, suspended: true },
  });
  await logAdminAction(admin.userId, 'admin.user.suspend_toggle', `${target.email} -> suspended=${String(body.suspended)}`);
- return NextResponse.json({ user: updated });
+ return NextResponse.json({ user: sanitizeUser(updated, admin.adminLevel) });
  }
 
  return NextResponse.json({ error: 'Champ "suspended" | "isAdmin" | "adminLevel" requis' }, { status: 400 });
@@ -129,6 +143,11 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
  try {
  const admin = await requireAdminPermission(request, 'users:write');
  if (!admin) return NextResponse.json({ error: 'Accès refusé' }, { status: 403 });
+
+ // Seulement les admins niveau 3 peuvent supprimer des utilisateurs
+ if (admin.adminLevel < 3) {
+ return NextResponse.json({ error: 'Vous n\'avez pas l\'accès à cette opération (niveau 3 requis)' }, { status: 403 });
+ }
 
  const { id } = await params;
 

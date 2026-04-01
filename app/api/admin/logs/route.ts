@@ -7,10 +7,15 @@ export async function GET(request: NextRequest) {
  const admin = await requireAdminPermission(request, 'logs:read');
  if (!admin) return NextResponse.json({ error: 'Accès refusé' }, { status: 403 });
 
+ // Les logs ne sont accessibles que pour les admins de niveau 3
+ if (admin.adminLevel < 3) {
+ return NextResponse.json({ error: 'Vous n\'avez pas l\'accès aux logs (niveau 3 requis)' }, { status: 403 });
+ }
+
  const { searchParams } = new URL(request.url);
  const page = parseInt(searchParams.get('page') ?? '1');
  const adminOnly = (searchParams.get('adminOnly') ?? 'false') === 'true';
- const limit = 50;
+ const limit = 200;
 
  const [logs, total] = await Promise.all([
  prisma.activityLog.findMany({

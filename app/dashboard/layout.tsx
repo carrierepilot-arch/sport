@@ -269,7 +269,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
  <div className="min-h-screen bg-[var(--ios-bg)] flex overflow-x-hidden apple-dashboard">
 
  {/* MOBILE HEADER */}
- <header className="md:hidden fixed top-0 inset-x-0 z-30 h-14 ios-nav-glass flex items-center px-4 gap-3 shadow-sm">
+ <header className="md:hidden fixed top-0 inset-x-0 z-[1500] h-14 ios-nav-glass flex items-center px-4 gap-3 shadow-sm">
  <button
  onClick={() => setDrawerOpen(true)}
  className="p-2 -ml-1 rounded-xl hover:bg-gray-100/90 transition-colors"
@@ -279,8 +279,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
  <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
  </svg>
  </button>
- <Link href="/dashboard">
- <img src="/logo-levelflow.png" alt="Levelflow" className="h-7 w-auto object-contain" />
+ <Link href="/dashboard" className="flex items-center gap-1.5">
+  <img src="/logo-icon.png" alt="" className="h-7 w-auto object-contain" />
  </Link>
  {(pendingCount + unreadMessages) > 0 && (
  <span className="ml-auto inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs bg-red-500 text-white rounded-full font-bold">
@@ -291,7 +291,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
  {/* MOBILE DRAWER */}
  {drawerOpen && (
- <div className="md:hidden fixed inset-0 z-40 flex">
+ <div className="md:hidden fixed inset-0 z-[1600] flex">
  {/* Backdrop */}
  <div
  className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
@@ -301,8 +301,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
  <aside className="relative w-72 max-w-[85vw] bg-white/95 backdrop-blur-md flex flex-col h-full shadow-2xl">
  {/* Header */}
  <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
- <Link href="/dashboard">
- <img src="/logo-levelflow.png" alt="Levelflow" className="h-8 w-auto object-contain" />
+ <Link href="/dashboard" className="flex items-center gap-2">
+  <img src="/logo-icon.png" alt="" className="h-8 w-auto object-contain" />
+  <img src="/logo-nom.png" alt="Levelflow" className="h-5 w-auto object-contain" />
  </Link>
  <button
  onClick={() => setDrawerOpen(false)}
@@ -431,11 +432,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
  <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
  </svg>
  </button>
- {!sidebarCollapsed && (
+ {sidebarCollapsed ? (
  <Link href="/dashboard">
- <img src="/logo-levelflow.jpg" alt="Levelflow" className="h-7 w-auto object-contain" />
+  <img src="/logo-icon.png" alt="Levelflow" className="h-7 w-auto object-contain" />
+ </Link>
+ ) : (
+ <Link href="/dashboard" className="flex items-center gap-2">
+  <img src="/logo-icon.png" alt="" className="h-7 w-auto object-contain" />
+  <img src="/logo-nom.png" alt="Levelflow" className="h-5 w-auto object-contain" />
  </Link>
  )}
+
+
+
  </div>
 
  {/* Nav */}

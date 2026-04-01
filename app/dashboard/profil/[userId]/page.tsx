@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { UserAvatar } from '@/components/UserAvatar';
+import LevelBadge from '@/app/components/LevelBadge';
 
 type PublicProfilePayload = {
   id: string;
@@ -86,7 +87,10 @@ export default function PublicProfilePage() {
                 <h1 className="text-2xl font-black text-gray-900">@{profile.pseudo}</h1>
                 {profile.verified && <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-1 text-[11px] font-bold text-sky-700">Verifie</span>}
               </div>
-              <p className="mt-1 text-sm text-gray-500">{profile.name || 'Athlete street workout'} · {profile.level} · {profile.xp} XP</p>
+              <p className="mt-1 text-sm text-gray-500">{profile.name || 'Athlete street workout'}</p>
+              <div className="mt-2">
+                <LevelBadge xp={profile.xp} size="md" showProgress />
+              </div>
               <div className="mt-4 grid grid-cols-4 gap-2 text-center text-sm">
                 <div className="rounded-2xl border border-gray-200 bg-gray-50 px-3 py-2"><p className="text-[11px] text-gray-500">Followers</p><p className="font-black text-gray-900">{profile.counts.followers}</p></div>
                 <div className="rounded-2xl border border-gray-200 bg-gray-50 px-3 py-2"><p className="text-[11px] text-gray-500">Suit</p><p className="font-black text-gray-900">{profile.counts.following}</p></div>
@@ -107,6 +111,26 @@ export default function PublicProfilePage() {
       </section>
 
       <section className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
+        <div className="space-y-6">
+        {/* Galerie photos */}
+        {!profile.isPrivate && profile.recentPosts.some((p) => p.text.startsWith('__IMAGE__')) && (
+          <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-black text-gray-900">Photos</h2>
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              {profile.recentPosts
+                .filter((p) => p.text.startsWith('__IMAGE__'))
+                .map((p) => {
+                  const firstLine = p.text.split('\n')[0];
+                  const imgUrl = firstLine.replace(/^__IMAGE__/, '').trim();
+                  return (
+                    <a key={p.id} href={imgUrl} target="_blank" rel="noopener noreferrer" className="block aspect-square overflow-hidden rounded-2xl border border-gray-100 bg-gray-100">
+                      <img src={imgUrl} alt="Publication" className="h-full w-full object-cover hover:scale-105 transition-transform duration-300" loading="lazy" />
+                    </a>
+                  );
+                })}
+            </div>
+          </div>
+        )}
         <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
           <h2 className="text-lg font-black text-gray-900">Publications</h2>
           <div className="mt-4 space-y-3">
@@ -119,6 +143,7 @@ export default function PublicProfilePage() {
               </article>
             ))}
           </div>
+        </div>
         </div>
 
         <div className="space-y-6">

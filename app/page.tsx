@@ -6,7 +6,10 @@ export default function Home() {
  {/* NAV */}
  <nav className="sticky top-0 z-20 ios-nav-glass flex justify-between items-center px-4 sm:px-8 py-4">
  <Link href="/">
- <img src="/logo-levelflow.png" alt="Levelflow" className="h-9 w-auto object-contain" />
+ <div className="flex items-center gap-2">
+ <img src="/logo-icon.png" alt="" className="h-9 w-auto object-contain" />
+ <img src="/logo-nom.png" alt="Levelflow" className="h-6 w-auto object-contain" />
+ </div>
  </Link>
  <div className="flex gap-2 sm:gap-3">
  <Link href="/login" className="px-4 sm:px-5 py-2 text-sm font-semibold text-gray-700 border border-gray-300 rounded-full hover:bg-white transition">
@@ -95,3 +98,4 @@ export default function Home() {
  </div>
  );
 }
+

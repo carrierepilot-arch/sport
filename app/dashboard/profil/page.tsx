@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { UserAvatar } from '@/components/UserAvatar';
+import LevelBadge from '@/app/components/LevelBadge';
 
 interface BadgeItem {
  id: string;
@@ -113,6 +114,7 @@ export default function ProfilPage() {
  const [pseudo, setPseudo] = useState('');
  const [name, setName] = useState('');
  const [level, setLevel] = useState('');
+ const [xp, setXp] = useState(0);
  const [weight, setWeight] = useState('');
  const [height, setHeight] = useState('');
  const [goal, setGoal] = useState('Force');
@@ -146,6 +148,7 @@ export default function ProfilPage() {
  setPseudo(data.user.pseudo ?? '');
  setUserEmail(data.user.email ?? '');
  setLevel(data.user.level ?? 'intermediaire');
+ setXp(typeof data.user.xp === 'number' ? data.user.xp : 0);
  setProfileImageUrl(data.user.profileImageUrl ?? null);
  setProfileVisibility(data.user.profileVisibility === 'private' ? 'private' : 'public');
  localStorage.setItem('user', JSON.stringify(data.user));
@@ -336,13 +339,7 @@ export default function ProfilPage() {
  </span>
  )}
  </div>
- <span className={`text-xs font-semibold px-3 py-1.5 rounded-full border ${
- level === 'elite' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
- level === 'intermediaire' ? 'bg-blue-50 text-blue-700 border-blue-200' :
- 'bg-gray-50 text-gray-700 border-gray-200'
- }`}>
- {level === 'elite' ? ' Élite' : level === 'intermediaire' ? ' Intermédiaire' : ' Débutant'}
- </span>
+ <LevelBadge xp={badgeProgress?.profile.xp ?? xp} size="md" showProgress />
  <div className="w-full border-t border-gray-100 pt-4 space-y-2">
  {[
  { label: 'Programmes', value: String(totalWorkouts) },

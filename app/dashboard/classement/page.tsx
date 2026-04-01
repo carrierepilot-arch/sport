@@ -67,6 +67,7 @@ function RankBadge({ rank }: { rank: number }) {
 
 export default function ClassementPage() {
  const [selectedExercise, setSelectedExercise] = useState('tractions');
+ const [viewMode, setViewMode] = useState<'perso' | 'villes' | 'lieux'>('perso');
  const [data, setData] = useState<LeaderboardResponse | null>(null);
  const [loading, setLoading] = useState(false);
  const [myUserId, setMyUserId] = useState<string | null>(null);
@@ -162,22 +163,38 @@ export default function ClassementPage() {
  {/* Content */}
  <div className="max-w-2xl mx-auto w-full px-3 sm:px-4 md:px-8 py-5 sm:py-6 space-y-4 overflow-x-hidden">
 
+ {/* View mode selector */}
+ <div className="flex gap-2 bg-gray-100 rounded-2xl p-1">
+ {([
+ { key: 'perso', label: 'Mes performances' },
+ { key: 'villes', label: 'Par ville' },
+ { key: 'lieux', label: 'Par lieu sportif' },
+ ] as { key: 'perso' | 'villes' | 'lieux'; label: string }[]).map((opt) => (
+ <button
+ key={opt.key}
+ onClick={() => setViewMode(opt.key)}
+ className={`flex-1 py-2 rounded-xl text-xs font-semibold transition-all ${viewMode === opt.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+ >
+ {opt.label}
+ </button>
+ ))}
+ </div>
+
  {/* Total count */}
- {data && !loading && (
+ {data && !loading && viewMode === 'perso' && (
  <p className="text-[11px] sm:text-xs text-gray-400 font-medium uppercase tracking-wide break-words pr-1">
  {data.total} athlète{data.total !== 1 ? 's' : ''} classé{data.total !== 1 ? 's' : ''} — {currentExercise.emoji} {currentExercise.label}
  </p>
  )}
 
  {/* Team leaderboard */}
- {teams.length > 0 && (
+ {viewMode !== 'perso' && teams.length > 0 && (
  <div className="grid gap-4 md:grid-cols-2">
  <div className="bg-white rounded-2xl border border-gray-100 p-4 sm:p-5">
  <div className="flex items-center justify-between">
  <h2 className="text-sm sm:text-base font-black text-gray-900">Top équipes</h2>
  <span className="text-[11px] text-gray-400 uppercase tracking-wide">Global</span>
- </div>
- <div className="mt-3 space-y-2">
+ </div> <div className="mt-3 space-y-2">
  {teams.slice(0, 5).map((team) => (
  <div key={team.groupId} className={`rounded-xl border px-3 py-2.5 ${team.isMember ? 'border-blue-200 bg-blue-50' : 'border-gray-200 bg-gray-50'}`}>
  <div className="flex items-center justify-between gap-2">
@@ -233,7 +250,7 @@ export default function ClassementPage() {
  )}
 
  {/* Leaderboard list */}
- {!loading && data && data.leaderboard.length === 0 && (
+ {!loading && data && data.leaderboard.length === 0 && viewMode === 'perso' && (
  <div className="bg-white rounded-2xl p-10 text-center">
  <p className="text-4xl mb-3"></p>
  <p className="text-gray-500 font-medium">Aucune performance validée pour l&apos;instant</p>
@@ -241,7 +258,7 @@ export default function ClassementPage() {
  </div>
  )}
 
- {!loading && data && data.leaderboard.length > 0 && (
+ {!loading && data && data.leaderboard.length > 0 && viewMode === 'perso' && (
  <div className="space-y-2 w-full max-w-full">
  {data.leaderboard.map((entry) => {
  const isMe = entry.userId === myUserId;
@@ -292,7 +309,7 @@ export default function ClassementPage() {
  )}
 
  {/* "My rank" banner if outside top 50 */}
- {!loading && data?.myEntry && !isMyEntryInTop && (
+ {!loading && data?.myEntry && !isMyEntryInTop && viewMode === 'perso' && (
  <div className="bg-blue-50 border border-blue-200 rounded-2xl px-3 sm:px-4 py-3.5 grid grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-2 sm:gap-4 min-w-0 max-w-full">
  <div className="flex-shrink-0 w-8 sm:w-9 flex items-center justify-center">
  <span className="w-8 h-8 flex items-center justify-center rounded-full bg-blue-100 text-blue-600 text-sm font-bold tabular-nums">
@@ -325,6 +342,14 @@ export default function ClassementPage() {
  <p className="text-xs text-center text-gray-400 pt-2 pb-6">
  Les ligues et les classements de villes reposent sur les performances validees par la communaute puis confirmees.
  </p>
+
+ {/* Mode lieux - message */}
+ {viewMode === 'lieux' && !loading && (
+ <div className="bg-white rounded-2xl border border-gray-100 p-6 text-center">
+ <p className="text-sm font-semibold text-gray-700">Classement par lieu sportif</p>
+ <p className="text-xs text-gray-400 mt-1">Les performances sont regroupees par ville ci-dessus. La granularite par spot arrive prochainement.</p>
+ </div>
+ )}
  </div>
  </div>
  );

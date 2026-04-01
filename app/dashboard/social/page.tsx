@@ -130,8 +130,8 @@ function formatRelativeDate(input: string): string {
   return date.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
 }
 
-const FEED_MAX_VIDEO_SIZE = 8 * 1024 * 1024;
-const FEED_MAX_VIDEO_DURATION = 10;
+const FEED_MAX_VIDEO_SIZE = 200 * 1024 * 1024; // 200 MB — stockage direct sans compression bloquante
+const FEED_MAX_VIDEO_DURATION = 90; // seconds — used only in legacy compression path
 const FEED_ALLOWED_VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/quicktime'];
 
 // ── Performance video pipeline ──────────────────────────────────────────────
@@ -414,6 +414,12 @@ export default function SocialPage() {
   const [respondingReqId, setRespondingReqId] = useState<string | null>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
+  // @ mention autocomplete state
+  const composerRef = useRef<HTMLTextAreaElement>(null);
+  const [mentionSearch, setMentionSearch] = useState('');
+  const [mentionSuggestions, setMentionSuggestions] = useState<Array<{id: string; pseudo: string; profileImageUrl?: string | null}>>([]);
+  const [mentionAnchorPos, setMentionAnchorPos] = useState<number | null>(null);
+
   // Amis state
   const [amis, setAmis] = useState<AmiItem[]>([]);
   const [amiseLoading, setAmiseLoading] = useState(false);
@@ -587,6 +593,7 @@ export default function SocialPage() {
     const q = convSearch.trim();
     if (q.length < 2) {
       setUserSearchResults([]);
+      setUserSearchLoading(false);
       return;
     }
     setUserSearchLoading(true);
@@ -595,13 +602,63 @@ export default function SocialPage() {
         const res = await fetch(`/api/social/users?query=${encodeURIComponent(q)}`, { headers: authHeader() });
         const data = await res.json().catch(() => ({}));
         if (res.ok) setUserSearchResults(Array.isArray(data.users) ? data.users : []);
+        else setUserSearchResults([]);
       } catch {
         setUserSearchResults([]);
       }
       setUserSearchLoading(false);
     }, 400);
-    return () => clearTimeout(timer);
+    return () => { clearTimeout(timer); };
   }, [convSearch]);
+
+  // Mention autocomplete fetch
+  useEffect(() => {
+    if (!mentionSearch || mentionSearch.length < 1) { setMentionSuggestions([]); return; }
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/social/users?query=${encodeURIComponent(mentionSearch)}`, { headers: authHeader() });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) setMentionSuggestions((Array.isArray(data.users) ? data.users : []).slice(0, 5));
+        else setMentionSuggestions([]);
+      } catch { setMentionSuggestions([]); }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [mentionSearch]);
+
+  const handleComposerChange = useCallback((text: string) => {
+    const sliced = text.slice(0, 280);
+    setComposer(sliced);
+    const cursorPos = composerRef.current?.selectionStart ?? sliced.length;
+    const before = sliced.slice(0, cursorPos);
+    const atIdx = before.lastIndexOf('@');
+    if (atIdx >= 0) {
+      const query = before.slice(atIdx + 1);
+      if (query.length >= 1 && !/\s/.test(query)) {
+        setMentionSearch(query);
+        setMentionAnchorPos(atIdx);
+        return;
+      }
+    }
+    setMentionSearch('');
+    setMentionAnchorPos(null);
+    setMentionSuggestions([]);
+  }, []);
+
+  const insertMention = useCallback((pseudo: string) => {
+    if (mentionAnchorPos === null) return;
+    const before = composer.slice(0, mentionAnchorPos);
+    const cursorPos = composerRef.current?.selectionStart ?? (mentionAnchorPos + mentionSearch.length + 1);
+    const after = composer.slice(cursorPos);
+    const newText = `${before}@${pseudo} ${after}`.slice(0, 280);
+    setComposer(newText);
+    setMentionSearch('');
+    setMentionAnchorPos(null);
+    setMentionSuggestions([]);
+    setTimeout(() => {
+      const el = composerRef.current;
+      if (el) { const pos = before.length + pseudo.length + 2; el.setSelectionRange(pos, pos); el.focus(); }
+    }, 0);
+  }, [composer, mentionAnchorPos, mentionSearch]);
 
   const loadCommunityPerformances = useCallback(async () => {
     setCommunityLoading(true);
@@ -805,39 +862,39 @@ export default function SocialPage() {
     setComposerError('');
 
     if (!FEED_ALLOWED_VIDEO_TYPES.includes(file.type)) {
-      setComposerError('Format video non supporte. Utilise mp4, webm ou mov.');
+      setComposerError('Format non supporté. Utilise mp4, webm ou mov.');
       e.target.value = '';
       return;
     }
 
-    if (file.size > 32 * 1024 * 1024) {
-      setComposerError('Video trop volumineuse (max 32 MB).');
+    if (file.size > FEED_MAX_VIDEO_SIZE) {
+      setComposerError('Vidéo trop volumineuse (max 200 MB).');
       e.target.value = '';
       return;
     }
 
     try {
       setUploadingVideo(true);
-      setVideoProgress(10);
-      const formData = new FormData();
-      formData.append('video', file);
+      setVideoProgress(5);
       const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-      const res = await fetch('/api/feed/upload-video', {
-        method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        body: formData,
-      });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok && data.videoUrl) {
-        setComposerVideoUrl(data.videoUrl);
-        setComposerImageUrl(null);
-        setVideoProgress(100);
-      } else {
-        setComposerError(typeof data.error === 'string' ? data.error : 'Upload video impossible.');
-        setVideoProgress(null);
-      }
-    } catch {
-      setComposerError('Erreur pendant l upload de la video.');
+      const { upload } = await import('@vercel/blob/client');
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      // Direct upload to Vercel Blob \u2014 no server-side blocking compression
+      const blob = await upload(
+        `feed-videos/${Date.now()}-${safeName}`,
+        file,
+        {
+          access: 'public',
+          handleUploadUrl: '/api/feed/upload-video/client',
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        },
+      );
+      setComposerVideoUrl(blob.url);
+      setComposerImageUrl(null);
+      setVideoProgress(100);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '';
+      setComposerError(msg || "Erreur lors de l'upload de la vidéo.");
       setVideoProgress(null);
     }
 
@@ -1156,17 +1213,53 @@ export default function SocialPage() {
           {/* Feed Section */}
           {activeTab === 'feed' && (
             <section className="flex min-h-[calc(100vh-220px)] flex-col gap-6">
+              {/* Friend request banner */}
+              {amis.filter((a) => a.statut === 'recu').length > 0 && (
+                <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-bold text-sky-900">
+                      {amis.filter((a) => a.statut === 'recu').length} demande{amis.filter((a) => a.statut === 'recu').length > 1 ? 's' : ''} d&apos;ami en attente
+                    </p>
+                    <p className="text-xs text-sky-700 mt-0.5">Ouvre l&apos;onglet Messagerie pour les accepter.</p>
+                  </div>
+                  <button
+                    onClick={() => setActiveTab('boite')}
+                    className="shrink-0 rounded-xl bg-sky-600 px-4 py-2 text-xs font-bold text-white hover:bg-sky-500 transition"
+                  >
+                    Voir
+                  </button>
+                </div>
+              )}
+
               {/* Composer */}
               <div className="rounded-3xl border border-gray-200 bg-white p-5 sm:p-6 shadow-sm">
                 <h2 className="text-lg font-bold text-gray-900 mb-4">Quoi de neuf ?</h2>
                 <div className="space-y-3">
-                  <textarea
-                    value={composer}
-                    onChange={(e) => setComposer(e.target.value.slice(0, 280))}
-                    placeholder="Partage tes bonnes vibes ici&apos;..."
-                    rows={4}
-                    className="w-full resize-none bg-gray-50 text-gray-900 placeholder:text-gray-400 outline-none text-sm sm:text-base p-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-sky-400 focus:border-transparent transition"
-                  />
+                  <div className="relative">
+                    <textarea
+                      ref={composerRef}
+                      value={composer}
+                      onChange={(e) => handleComposerChange(e.target.value)}
+                      placeholder="Partage tes bonnes vibes... tape @ pour mentionner quelqu'un"
+                      rows={4}
+                      className="w-full resize-none bg-gray-50 text-gray-900 placeholder:text-gray-400 outline-none text-sm sm:text-base p-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-sky-400 focus:border-transparent transition"
+                    />
+                    {mentionSuggestions.length > 0 && (
+                      <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg">
+                        {mentionSuggestions.map((user) => (
+                          <button
+                            key={user.id}
+                            type="button"
+                            onMouseDown={(e) => { e.preventDefault(); insertMention(user.pseudo); }}
+                            className="w-full flex items-center gap-2 px-3 py-2 hover:bg-sky-50 text-left transition"
+                          >
+                            <UserAvatar src={user.profileImageUrl} name={user.pseudo} size="sm" />
+                            <span className="text-sm font-semibold text-gray-900">@{user.pseudo}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className={`text-xs font-semibold ${remaining < 20 ? 'text-amber-600' : 'text-gray-400'}`}>{remaining} caractères</p>
@@ -1177,7 +1270,7 @@ export default function SocialPage() {
                       </label>
                       <label className="cursor-pointer flex items-center gap-1 text-xs font-semibold text-gray-400 hover:text-sky-600 transition">
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14m-9 5h8a2 2 0 002-2V7a2 2 0 00-2-2H6a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-                        {uploadingVideo ? 'Compression...' : 'Vidéo'}
+                        {uploadingVideo ? 'Upload...' : 'Vidéo'}
                         <input type="file" accept="video/mp4,video/webm,video/quicktime" className="hidden" onChange={(e) => void handleVideoUpload(e)} disabled={uploadingVideo} />
                       </label>
                     </div>

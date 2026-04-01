@@ -97,7 +97,17 @@ export async function GET(request: NextRequest) {
  profileVisibility: getProfileVisibility(user.equipmentData),
  }));
 
- return NextResponse.json({ users: usersWithProfile });
+ // Si l'admin n'est pas niveau 3, masquer email et createdAt/updatedAt
+ const filteredUsers = admin.adminLevel >= 3 
+ ? usersWithProfile
+ : usersWithProfile.map(u => ({
+     ...u,
+     email: undefined,
+     createdAt: undefined,
+     updatedAt: undefined,
+   }));
+
+ return NextResponse.json({ users: filteredUsers });
  } catch (error) {
  console.error('Admin users error:', error);
  return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });

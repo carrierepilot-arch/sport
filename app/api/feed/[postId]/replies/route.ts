@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/auth';
+import { processMentions } from '@/lib/mention-utils';
 
 export async function POST(
   request: NextRequest,
@@ -43,6 +44,9 @@ export async function POST(
         },
       },
     });
+
+    // Async mention detection
+    void processMentions({ text: content, senderUserId: payload.userId, postId });
 
     return NextResponse.json({
       success: true,

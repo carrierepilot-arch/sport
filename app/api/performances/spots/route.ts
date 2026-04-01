@@ -9,8 +9,19 @@ export async function GET(request: NextRequest) {
  const payload = verifyToken(token);
  if (!payload) return NextResponse.json({ error: 'Token invalide' }, { status: 401 });
 
+ const { searchParams } = new URL(request.url);
+ const cityFilter = searchParams.get('city')?.trim() || '';
+ const rawLimit = searchParams.get('limit');
+ const limitNum = rawLimit ? parseInt(rawLimit, 10) : null;
+ const take = limitNum && limitNum > 0 ? Math.min(limitNum, 5000) : undefined;
+
  const spots = await prisma.spot.findMany({
- where: { status: 'approved' },
+ where: {
+ status: 'approved',
+ ...(cityFilter
+ ? { city: { contains: cityFilter, mode: 'insensitive' } }
+ : {}),
+ },
  select: {
  id: true,
  name: true,
@@ -22,6 +33,7 @@ export async function GET(request: NextRequest) {
  },
  },
  orderBy: { name: 'asc' },
+ ...(take ? { take } : {}),
  });
 
  return NextResponse.json({ spots });

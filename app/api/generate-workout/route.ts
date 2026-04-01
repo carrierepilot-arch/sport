@@ -5,8 +5,8 @@ import { verifyToken } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { logApiCall } from '@/lib/api-logger';
 
-// Extend Vercel function timeout to 60 s (Pro plan) for OpenAI calls
-export const maxDuration = 60;
+// Extend Vercel function timeout to 120 s (Pro plan) for long AI calls
+export const maxDuration = 120;
 
 type ProviderCounters = {
  wgerCalls: number;
@@ -474,7 +474,7 @@ ${formatInstruction}`;
  const totalExercices = targetExercices * nbJours;
  const sessionTokens = Math.max(3000, totalExercices * tokensPerExercice + 1200);
  const maxTokens = isMultiWeek
- ? Math.min(14000, 2200 + nbSemaines * nbJours * targetExercices * 45)
+ ? Math.min(16000, 2500 + nbSemaines * nbJours * targetExercices * 60)
  : Math.min(10000, sessionTokens);
 
  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -483,6 +483,7 @@ ${formatInstruction}`;
  messages: [{ role: 'user', content: prompt }],
  max_tokens: maxTokens,
  temperature: 0.7,
+ response_format: { type: 'json_object' },
  });
 
  const programme = completion.choices[0]?.message?.content ?? '';

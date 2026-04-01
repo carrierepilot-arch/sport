@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/auth';
 import { getProfileImageUrl, getProfileVisibility } from '@/lib/social';
+import { processMentions } from '@/lib/mention-utils';
 
 function getToken(request: NextRequest): string | null {
   const auth = request.headers.get('authorization');
@@ -232,6 +233,9 @@ export async function POST(request: NextRequest) {
         },
       },
     });
+
+    // Async mention detection (do not await — non-blocking)
+    void processMentions({ text: content, senderUserId: payload.userId, postId: created.id });
 
     return NextResponse.json({
       success: true,

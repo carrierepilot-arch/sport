@@ -949,10 +949,153 @@ function inferSessionType(text: string): SessionType {
  return 'force';
 }
 
+// ── Tutoriels Street Workout ──────────────────────────────────────────────
+
+const TUTOS = [
+ {
+ id: 'front-lever',
+ title: 'Front Lever',
+ level: 'Avancé',
+ levelColor: 'bg-red-100 text-red-700',
+ description: 'Mouvement de gainage isométrique à la barre horizontale où le corps est maintenu horizontal, bras tendus.',
+ muscles: ['Dorsaux', 'Abdominaux', 'Biceps', 'Épaules'],
+ etapes: [
+ { titre: 'Prérequis', contenu: 'Maîtriser ≥ 12 tractions strictes. Bonne force de gainage (planche 2 min).' },
+ { titre: 'Progressions', contenu: '1. Tucked front lever (genoux pliés) → 2. Advanced tucked → 3. Jambe tendue écart → 4. Half lever (1 jambe) → 5. Front lever complet.' },
+ { titre: 'Technique', contenu: 'Saisir la barre en pronation. Contracter les dorsaux et scapulas. Maintenir les hanches alignées avec les épaules. Corps rigide, tête neutre.' },
+ { titre: 'Durée & volume', contenu: 'Viser 3×5 sec en débutant. Progresser jusqu\'à 3×10 sec. Ajouter 1-2 secondes par semaine.' },
+ { titre: 'Erreurs fréquentes', contenu: 'Hanches qui tombent, bras fléchis, épaules arrondies. Se concentrer sur le gainage global.' },
+ ],
+ },
+ {
+ id: 'muscle-up',
+ title: 'Muscle Up',
+ level: 'Intermédiaire',
+ levelColor: 'bg-orange-100 text-orange-700',
+ description: 'Mouvement combinant une traction explosive au-dessus de la barre suivi d\'un dip complet.',
+ muscles: ['Dorsaux', 'Triceps', 'Pectoraux', 'Biceps', 'Épaules'],
+ etapes: [
+ { titre: 'Prérequis', contenu: 'Maîtriser ≥ 10 tractions strictes + ≥ 10 dips solides. Bonne force explosive.' },
+ { titre: 'Progressions', contenu: '1. Traction haute (menton bien au-dessus) → 2. Negative muscle up (descente contrôlée) → 3. Kipping muscle up → 4. Strict muscle up.' },
+ { titre: 'Technique', contenu: 'Position de saisie en pronation légèrement large. Phase pull : traction verticale explosive en ramenant les coudes vers la hanche. Phase transition : incliner le buste vers l\'avant. Phase push : pousser au-dessus de la barre.' },
+ { titre: 'Durée & volume', contenu: 'Commencer par 3×1 rep. Progresser : 3×3, 3×5. Viser des séries propres avant d\'augmenter le volume.' },
+ { titre: 'Erreurs fréquentes', contenu: 'Saisie trop large, pas assez d\'explosivité, transition bloquée au niveau de la poitrine.' },
+ ],
+ },
+ {
+ id: 'human-flag',
+ title: 'Human Flag',
+ level: 'Expert',
+ levelColor: 'bg-purple-100 text-purple-700',
+ description: 'Corps maintenu horizontalement à côté d\'un poteau vertical, bras tendus en opposition.',
+ muscles: ['Obliques', 'Dorsaux', 'Épaules', 'Abdominaux', 'Triceps'],
+ etapes: [
+ { titre: 'Prérequis', contenu: 'Front lever maîtrisé. Très forte stabilité d\'épaule. Bonne force latérale globale.' },
+ { titre: 'Progressions', contenu: '1. Tucked side lever (genoux repliés) → 2. Un genou tendu → 3. Jambes écartées → 4. Human flag strict.' },
+ { titre: 'Technique', contenu: 'Main basse en pronation (pousse), main haute en supination (tire). Contracter les obliques, garder le corps rigide. Regard droit devant.' },
+ { titre: 'Durée & volume', contenu: '3×3 sec au début. Progresser à 3×8-10 sec. Travailler les deux côtés.' },
+ { titre: 'Erreurs fréquentes', contenu: 'Hanches qui tombent du mauvais côté, bras qui plient, épaules qui remontent.' },
+ ],
+ },
+];
+
+function TutoTab() {
+ const [modal, setModal] = useState<{ id: string; step: number } | null>(null);
+ const tuto = modal ? TUTOS.find((t) => t.id === modal.id) ?? null : null;
+
+ return (
+ <div className="space-y-5">
+ <div className="rounded-2xl border border-gray-200 bg-white p-5 sm:p-6 shadow-sm">
+ <h2 className="text-lg font-bold text-gray-900 mb-1">Tutoriels Street Workout</h2>
+ <p className="text-sm text-gray-500">Apprenez les mouvements emblématiques du street workout, étape par étape.</p>
+ </div>
+
+ <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+ {TUTOS.map((t) => (
+ <div key={t.id} className="flex flex-col rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+ <div className="flex-1 p-5 space-y-3">
+ <div className="flex items-center justify-between gap-2">
+ <h3 className="text-base font-black text-gray-900">{t.title}</h3>
+ <span className={`flex-shrink-0 text-[11px] font-semibold px-2.5 py-1 rounded-full ${t.levelColor}`}>{t.level}</span>
+ </div>
+ <p className="text-xs text-gray-500 leading-relaxed line-clamp-3">{t.description}</p>
+ <div className="flex flex-wrap gap-1.5">
+ {t.muscles.slice(0, 3).map((m) => (
+ <span key={m} className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-semibold border border-emerald-100">{m}</span>
+ ))}
+ {t.muscles.length > 3 && <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 text-[11px] font-semibold border border-gray-200">+{t.muscles.length - 3}</span>}
+ </div>
+ </div>
+ <div className="px-5 pb-5">
+ <button
+ onClick={() => setModal({ id: t.id, step: 0 })}
+ className="w-full py-2.5 rounded-xl bg-gray-900 text-white text-sm font-bold hover:bg-gray-700 transition"
+ >
+ Démarrer
+ </button>
+ </div>
+ </div>
+ ))}
+ </div>
+
+ <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-5 text-center">
+ <p className="text-sm font-semibold text-gray-600">D&apos;autres tutoriels arrivent prochainement</p>
+ <p className="text-xs text-gray-400 mt-1">Planche, Back lever, 360°, Victorian...</p>
+ </div>
+
+ {/* Modal tutoriel */}
+ {modal && tuto && (
+ <div className="fixed inset-0 z-[2000] flex items-end sm:items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setModal(null)}>
+ <div className="w-full max-w-lg rounded-3xl bg-white shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+ <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+ <div>
+ <h3 className="text-lg font-black text-gray-900">{tuto.title}</h3>
+ <div className="flex items-center gap-2 mt-0.5">
+ <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${tuto.levelColor}`}>{tuto.level}</span>
+ <span className="text-xs text-gray-400">Étape {modal.step + 1}/{tuto.etapes.length}</span>
+ </div>
+ </div>
+ <button onClick={() => setModal(null)} className="p-2 rounded-xl hover:bg-gray-100 text-gray-500">
+ <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+ </button>
+ </div>
+ <div className="px-6 py-5 space-y-4 min-h-[200px]">
+ <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">{modal.step + 1}. {tuto.etapes[modal.step].titre}</p>
+ <p className="text-sm text-gray-700 leading-relaxed">{tuto.etapes[modal.step].contenu}</p>
+ </div>
+ <div className="flex items-center gap-3 px-6 py-4 border-t border-gray-100">
+ <button
+ onClick={() => setModal((m) => m ? { ...m, step: m.step - 1 } : m)}
+ disabled={modal.step === 0}
+ className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-40 transition"
+ >
+ Précédent
+ </button>
+ {modal.step < tuto.etapes.length - 1 ? (
+ <button
+ onClick={() => setModal((m) => m ? { ...m, step: m.step + 1 } : m)}
+ className="flex-1 py-2.5 rounded-xl bg-gray-900 text-white text-sm font-bold hover:bg-gray-700 transition"
+ >
+ Suivant
+ </button>
+ ) : (
+ <button onClick={() => setModal(null)} className="flex-1 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 transition">
+ Terminer
+ </button>
+ )}
+ </div>
+ </div>
+ </div>
+ )}
+ </div>
+ );
+}
+
 export default function EntrainementPage() {
  // Config state
  const [userLevel, setUserLevel] = useState<UserLevel | ''>('');
  const [userXp, setUserXp] = useState(0);
+ const [showEquip, setShowEquip] = useState(false);
  const [objectifs, setObjectifs] = useState<Objectif[]>([]);
  const [tempsSeance, setTempsSeance] = useState<TempsSeance>('');
  const [dureeProgramme, setDureeProgramme] = useState<DureeProgramme>('');
@@ -991,7 +1134,7 @@ export default function EntrainementPage() {
  const [shareError, setShareError] = useState<string | null>(null);
  const [shareWorkoutId, setShareWorkoutId] = useState<string | null>(null);
  const [creationMode, setCreationMode] = useState(false);
- const [entrainementTab, setEntrainementTab] = useState<'config' | 'seances' | 'defis' | 'equipement'>('seances');
+ const [entrainementTab, setEntrainementTab] = useState<'config' | 'seances' | 'tuto' | 'defis'>('seances');
  // ── Défis de la semaine ──
  const [challenges, setChallenges] = useState<{
  id: string; title: string; description: string;
@@ -1256,7 +1399,7 @@ export default function EntrainementPage() {
  }
  }, []);
 
- useEffect(() => { if (entrainementTab === 'defis') loadChallenges(); }, [entrainementTab, loadChallenges]);
+ useEffect(() => { if (entrainementTab === ('defis' as string)) loadChallenges(); }, [entrainementTab, loadChallenges]);
 
  const persistGeneratedWorkout = useCallback(async (programmeText: string, nextProgrammeData: ProgrammeData) => {
  const token = localStorage.getItem('token');
@@ -1592,7 +1735,7 @@ export default function EntrainementPage() {
  {([
  { key: 'seances' as const, label: `Mes séances${savedWorkouts.length > 0 ? ` (${savedWorkouts.length})` : ''}` },
  { key: 'config' as const, label: 'Programmes sur mesure' },
- { key: 'equipement' as const, label: 'Equipement' },
+ { key: 'tuto' as const, label: 'Tuto' },
  ]).map((t) => (
  <button key={t.key} onClick={() => setEntrainementTab(t.key)}
  className={`snap-start flex-shrink-0 px-4 py-2 sm:px-5 rounded-lg text-xs sm:text-sm font-medium transition ${entrainementTab === t.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
@@ -2027,6 +2170,7 @@ export default function EntrainementPage() {
  style={{ width: `${genProgress}%` }}
  />
  </div>
+ <p className="mt-2 text-xs text-amber-600 font-medium">La création du programme peut prendre jusqu&apos;à 2 minutes.</p>
  </div>
  )}
 
@@ -2550,6 +2694,80 @@ imgClassName="w-full h-32 object-contain bg-slate-50"
  </Section>
  )}
 
+ {/* ═══════ ÉQUIPEMENT (dans séances) ═══════ */}
+ <section className="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 shadow-sm mt-5">
+ <div className="flex items-center justify-between gap-3 mb-2">
+ <div>
+ <h2 className="text-lg font-bold text-gray-900">Équipement disponible</h2>
+ <p className="text-sm text-gray-500">{equipements.length > 0 ? `${equipements.length} équipement${equipements.length !== 1 ? 's' : ''} sélectionné${equipements.length !== 1 ? 's' : ''}` : 'Aucun équipement sélectionné'}</p>
+ </div>
+ <button onClick={() => setShowEquip((v) => !v)} className="flex-shrink-0 px-4 py-2 rounded-xl text-sm font-semibold border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700 transition">
+ {showEquip ? 'Masquer' : 'Afficher'}
+ </button>
+ </div>
+ {showEquip && (
+ <>
+ <div className="space-y-3 mt-4">
+ {(['Ceinture lestee', 'Gilet leste', 'Elastiques', 'Halteres', 'Barre de traction', 'Parallettes', 'Anneaux', 'Autre'] as Equipement[]).map((eq) => {
+ const needsKg = ['Ceinture lestee', 'Gilet leste', 'Halteres'].includes(eq);
+ const needsDetail = ['Elastiques', 'Autre'].includes(eq);
+ const icon = eq === 'Ceinture lestee' ? '' : eq === 'Gilet leste' ? '' : eq === 'Elastiques' ? '' : eq === 'Halteres' ? '' : eq === 'Barre de traction' ? '' : eq === 'Parallettes' ? '' : eq === 'Anneaux' ? '' : '';
+ return (
+ <div key={eq}>
+ <button
+ onClick={() => toggleEquip(eq)}
+ className={`w-full flex items-center justify-between px-5 py-4 rounded-xl border-2 text-sm font-semibold transition ${
+ equipements.includes(eq)
+ ? 'border-emerald-500 bg-emerald-500 text-white'
+ : 'border-gray-200 text-gray-600 hover:border-gray-400 bg-white'
+ }`}
+ >
+ <span>{icon} {eq}</span>
+ <span className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
+ equipements.includes(eq) ? 'border-white bg-white/20' : 'border-gray-300'
+ }`}>
+ {equipements.includes(eq) && (
+ <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 10 10">
+ <path d="M1.5 5l2.5 2.5 4.5-4.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+ </svg>
+ )}
+ </span>
+ </button>
+ {equipements.includes(eq) && (
+ <div className="mt-2 ml-3 border border-emerald-200 bg-emerald-50 rounded-xl p-5 space-y-4">
+ {needsKg && (
+ <div>
+ <p className="text-sm font-medium text-gray-700 mb-2">Charge maximale</p>
+ <div className="flex items-center gap-4">
+ <input type="range" min={0} max={80} step={0.5} value={equipConfig[eq]?.maxKg ?? 0} onChange={(e) => updateEquipKg(eq, Number(e.target.value))} className="flex-1 accent-emerald-500" />
+ <span className="w-16 text-right text-sm font-bold text-emerald-800 tabular-nums">{equipConfig[eq]?.maxKg ?? 0} kg</span>
+ </div>
+ </div>
+ )}
+ {needsKg && (
+ <div>
+ <p className="text-sm font-medium text-gray-700 mb-2">Progression par palier</p>
+ <input type="text" value={equipConfig[eq]?.progression ?? ''} onChange={(e) => updateEquipProg(eq, e.target.value)} placeholder="ex: +2 kg, +5 kg..." className="w-full px-4 py-2.5 rounded-lg border border-emerald-300 text-sm text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none" />
+ </div>
+ )}
+ {needsDetail && (
+ <div>
+ <p className="text-sm font-medium text-gray-700 mb-2">{eq === 'Elastiques' ? 'Résistance disponible (ex: légère, moyenne, forte)' : 'Précisez votre équipement'}</p>
+ <input type="text" value={equipConfig[eq]?.detail ?? ''} onChange={(e) => setEquipConfig((p) => { const nv = { ...p, [eq]: { ...p[eq], detail: e.target.value } }; saveEquipment(equipements, nv); return nv; })} placeholder={eq === 'Elastiques' ? 'ex: légère (5kg), moyenne (15kg), forte (25kg)' : 'ex: kettlebell 16kg, TRX...'} className="w-full px-4 py-2.5 rounded-lg border border-emerald-300 text-sm text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none" />
+ </div>
+ )}
+ </div>
+ )}
+ </div>
+ );
+ })}
+ </div>
+ <div className="mt-6 p-4 bg-gray-50 rounded-xl">
+ <p className="text-xs text-gray-500"><strong>{equipements.length}</strong> équipement{equipements.length !== 1 ? 's' : ''} sélectionné{equipements.length !== 1 ? 's' : ''}</p>
+ </div>
+ </>)}
+ </section>
+
  </>)} {/* ── end tab séances (saved workouts) ── */}
 
  {/* ═══════ TAB: GÉNÉRATEUR (test & biblio) ═══════ */}
@@ -2712,8 +2930,13 @@ imgClassName="w-full h-28 object-contain bg-slate-50"
 
  </>)} {/* ── end tab séances (analyse) ── */}
 
- {/* ═══════ TAB: ÉQUIPEMENT ═══════ */}
- {entrainementTab === 'equipement' && (
+ {/* ═══════ TAB: TUTO ═══════ */}
+ {entrainementTab === 'tuto' && (
+ <TutoTab />
+ )}
+
+ {/* ═══════ TAB: ÉQUIPEMENT (désactivé - fusionné dans séances) ═══════ */}
+ {false && (
  <section className="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 shadow-sm">
  <div className="flex items-center gap-3 mb-6">
  <span className="text-3xl"></span>
@@ -2784,7 +3007,7 @@ imgClassName="w-full h-28 object-contain bg-slate-50"
  )}
 
  {/* ═══════ TAB: DÉFIS ═══════ */}
- {entrainementTab === 'defis' && (
+ {(entrainementTab as string) === 'defis' && (
  <div className="space-y-4">
  {/* Header + create button */}
  <div className="flex flex-col sm:flex-row items-start sm:justify-between gap-2">

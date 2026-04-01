@@ -46,7 +46,7 @@ interface ApiStatsPayload {
 interface TrendDay { label: string; count: number }
 interface TopUser { display: string; email: string; messages: number; friendRequests: number }
 
-type AdminTab = 'overview' | 'users' | 'logs' | 'analytics' | 'performances' | 'suggestions' | 'exerciseScraper' | 'controlCenter';
+type AdminTab = 'overview' | 'users' | 'logs' | 'analytics' | 'performances' | 'suggestions' | 'exerciseScraper' | 'controlCenter' | 'posts';
 
 interface PerfRow {
  id: string;
@@ -297,6 +297,9 @@ export default function AdminPage() {
  const [reportTotals, setReportTotals] = useState<ReportTotalRow[]>([]);
  const [suggestions, setSuggestions] = useState<SuggestionRow[]>([]);
  const [suggestionsUnavailable, setSuggestionsUnavailable] = useState(false);
+ const [feedPosts, setFeedPosts] = useState<Array<{ id: string; content: string; createdAt: string; author: { id: string; pseudo: string } }>>([]);
+ const [feedPostsLoading, setFeedPostsLoading] = useState(false);
+ const [deletingPost, setDeletingPost] = useState<string | null>(null);
  const [scraperSummary, setScraperSummary] = useState<ScraperSummary | null>(null);
  const [scraperDbCount, setScraperDbCount] = useState(0);
  const [scraperRunning, setScraperRunning] = useState(false);
@@ -526,6 +529,36 @@ export default function AdminPage() {
 			 alert(data.error || 'Erreur');
 		 } else {
 			 setUsers(prev => prev.map(u => (u.id === user.id ? { ...u, profileImageUrl: data.user?.profileImageUrl ?? null } : u)));
+		 }
+	 } catch {
+		 alert('Erreur reseau');
+	 }
+	 setActionLoading(null);
+ };
+
+ const uploadProfilePhoto = async (user: UserRow, file: File | null) => {
+	 if (!file) return;
+	 setActionLoading(user.id);
+	 try {
+		 const formData = new FormData();
+		 formData.append('image', file);
+		 const uploadRes = await fetch('/api/feed/upload-image', {
+			 method: 'POST',
+			 headers: authHeader(),
+			 body: formData,
+		 });
+		 const uploadData = await uploadRes.json().catch(() => ({}));
+		 if (!uploadRes.ok) { alert(uploadData.error || 'Erreur upload'); setActionLoading(null); return; }
+		 const patchRes = await fetch(`/api/admin/users/${user.id}`, {
+			 method: 'PATCH',
+			 headers: authHeader(),
+			 body: JSON.stringify({ profileImageUrl: uploadData.imageUrl }),
+		 });
+		 const patchData = await patchRes.json().catch(() => ({}));
+		 if (!patchRes.ok) {
+			 alert(patchData.error || 'Erreur');
+		 } else {
+			 setUsers(prev => prev.map(u => (u.id === user.id ? { ...u, profileImageUrl: patchData.user?.profileImageUrl ?? uploadData.imageUrl } : u)));
 		 }
 	 } catch {
 		 alert('Erreur reseau');
@@ -1095,6 +1128,7 @@ export default function AdminPage() {
  <div className="overflow-x-auto -mx-2 px-2 sm:mx-0 sm:px-0 mb-5 sm:mb-8 scrollbar-none" style={{ WebkitOverflowScrolling: 'touch' }}>
  <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-fit min-w-fit">
  {([
+ { key: 'posts', label: `Posts feed (${feedPosts.length})`, shortLabel: `Posts (${feedPosts.length})` },
  { key: 'overview', label: 'Vue globale', shortLabel: 'Global' },
  { key: 'users', label: `Utilisateurs (${users.length})`, shortLabel: `Users (${users.length})` },
  { key: 'logs', label: `Activité (${logs.length})`, shortLabel: `Logs (${logs.length})` },
@@ -1109,6 +1143,14 @@ export default function AdminPage() {
  onClick={() => {
  setTab(t.key);
  if (t.key === 'controlCenter') void loadScraperCandidates();
+ if (t.key === 'posts') {
+ setFeedPostsLoading(true);
+ fetch('/api/feed?scope=all&limit=200', { headers: authHeader() })
+ .then(r => r.json())
+ .then(d => setFeedPosts(Array.isArray(d.posts) ? d.posts : []))
+ .catch(() => {})
+ .finally(() => setFeedPostsLoading(false));
+ }
  }}
  className={`px-2.5 sm:px-5 py-2 rounded-lg text-xs sm:text-sm font-medium transition whitespace-nowrap ${tab === t.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
  <span className="sm:hidden">{t.shortLabel}</span>
@@ -1351,7 +1393,11 @@ export default function AdminPage() {
  <button onClick={() => moderateName(u)} disabled={actionLoading === u.id}
  className="px-2 py-1 text-xs font-medium rounded-lg border border-violet-200 text-violet-700 hover:bg-violet-50 transition disabled:opacity-50">Nom</button>
  <button onClick={() => removeProfilePhoto(u)} disabled={actionLoading === u.id}
- className="px-2 py-1 text-xs font-medium rounded-lg border border-rose-200 text-rose-700 hover:bg-rose-50 transition disabled:opacity-50">Photo</button>
+ className="px-2 py-1 text-xs font-medium rounded-lg border border-rose-200 text-rose-700 hover:bg-rose-50 transition disabled:opacity-50">Suppr. photo</button>
+ <label className={`cursor-pointer px-2 py-1 text-xs font-medium rounded-lg border border-emerald-200 text-emerald-700 hover:bg-emerald-50 transition${actionLoading === u.id ? ' opacity-50 pointer-events-none' : ''}`}>
+ Changer photo
+ <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => void uploadProfilePhoto(u, e.target.files?.[0] ?? null)} disabled={actionLoading === u.id} />
+ </label>
  <button onClick={() => sendAdminMessage(u.id, u.email)} disabled={actionLoading === u.id}
  className="px-2 py-1 text-xs font-medium rounded-lg border border-blue-200 text-blue-700 hover:bg-blue-50 transition disabled:opacity-50">Msg</button>
  <button onClick={() => toggleSuspend(u.id, !u.suspended)} disabled={actionLoading === u.id}
@@ -1422,7 +1468,11 @@ export default function AdminPage() {
  <button onClick={() => moderateName(u)} disabled={actionLoading === u.id}
  className="px-3 py-1.5 text-xs font-medium rounded-lg border border-violet-200 text-violet-700 hover:bg-violet-50 transition disabled:opacity-50">Nom</button>
  <button onClick={() => removeProfilePhoto(u)} disabled={actionLoading === u.id}
- className="px-3 py-1.5 text-xs font-medium rounded-lg border border-rose-200 text-rose-700 hover:bg-rose-50 transition disabled:opacity-50">Photo</button>
+ className="px-3 py-1.5 text-xs font-medium rounded-lg border border-rose-200 text-rose-700 hover:bg-rose-50 transition disabled:opacity-50">Suppr. photo</button>
+ <label className={`cursor-pointer px-3 py-1.5 text-xs font-medium rounded-lg border border-emerald-200 text-emerald-700 hover:bg-emerald-50 transition${actionLoading === u.id ? ' opacity-50 pointer-events-none' : ''}`}>
+ Changer photo
+ <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => void uploadProfilePhoto(u, e.target.files?.[0] ?? null)} disabled={actionLoading === u.id} />
+ </label>
  <button onClick={() => sendAdminMessage(u.id, u.email)} disabled={actionLoading === u.id}
  className="px-3 py-1.5 text-xs font-medium rounded-lg border border-blue-200 text-blue-700 hover:bg-blue-50 transition disabled:opacity-50">Message</button>
  <button onClick={() => toggleSuspend(u.id, !u.suspended)} disabled={actionLoading === u.id}
@@ -1518,6 +1568,81 @@ export default function AdminPage() {
  <p className="bg-white border border-gray-200 rounded-xl p-6 text-sm text-gray-400 text-center">Aucune activité.</p>
  )}
  </div>
+ </div>
+ )}
+
+ {/* ── POSTS FEED (MODERATION) ── */}
+ {tab === 'posts' && (
+ <div className="space-y-4">
+ <div className="flex items-center justify-between gap-3">
+ <div>
+ <h2 className="text-lg font-black text-gray-900">Modération des posts</h2>
+ <p className="text-sm text-gray-500">Supprimez les publications inappropriées du feed.</p>
+ </div>
+ <button
+ onClick={() => {
+ setFeedPostsLoading(true);
+ fetch('/api/feed?scope=all&limit=200', { headers: authHeader() })
+ .then(r => r.json())
+ .then(d => setFeedPosts(Array.isArray(d.posts) ? d.posts : []))
+ .catch(() => {})
+ .finally(() => setFeedPostsLoading(false));
+ }}
+ className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50"
+ >
+ Actualiser
+ </button>
+ </div>
+ {feedPostsLoading ? (
+ <div className="py-12 text-center text-sm text-gray-400">Chargement des posts...</div>
+ ) : feedPosts.length === 0 ? (
+ <div className="py-12 text-center text-sm text-gray-400">Aucun post pour l&apos;instant.</div>
+ ) : (
+ <div className="space-y-3">
+ {feedPosts.map((post) => {
+ const rawText = post.content ?? '';
+ const isImage = rawText.startsWith('__IMAGE__');
+ const isVideo = rawText.startsWith('__VIDEO__');
+ const firstLine = rawText.split('\n')[0] ?? '';
+ const mediaUrl = (isImage || isVideo) ? firstLine.replace(/^__(IMAGE|VIDEO)__/, '').trim() : null;
+ const caption = rawText.replace(/^__(IMAGE|VIDEO)__[^\n]*\n?/, '').trim();
+ return (
+ <div key={post.id} className="rounded-2xl border border-gray-200 bg-white p-4">
+ <div className="flex items-start justify-between gap-3">
+ <div className="min-w-0">
+ <p className="text-xs font-bold text-gray-700">@{post.author?.pseudo ?? 'inconnu'}</p>
+ <p className="text-xs text-gray-400">{new Date(post.createdAt).toLocaleString('fr-FR')}</p>
+ {isImage && mediaUrl && (
+ <img src={mediaUrl} alt="" className="mt-2 max-h-32 rounded-xl border border-gray-100 object-cover" />
+ )}
+ {isVideo && mediaUrl && (
+ <video src={mediaUrl} className="mt-2 max-h-32 rounded-xl border border-gray-100" controls muted />
+ )}
+ {caption && <p className="mt-2 text-sm text-gray-800 line-clamp-3 whitespace-pre-wrap">{caption}</p>}
+ {!isImage && !isVideo && <p className="mt-2 text-sm text-gray-800 line-clamp-3 whitespace-pre-wrap">{rawText}</p>}
+ </div>
+ <button
+ onClick={async () => {
+ if (!confirm('Supprimer ce post définitivement ?')) return;
+ setDeletingPost(post.id);
+ try {
+ const res = await fetch(`/api/feed/${post.id}`, { method: 'DELETE', headers: authHeader() });
+ if (res.ok) setFeedPosts(prev => prev.filter(p => p.id !== post.id));
+ else alert('Erreur lors de la suppression.');
+ } catch { alert('Erreur réseau.'); }
+ setDeletingPost(null);
+ }}
+ disabled={deletingPost === post.id}
+ className="shrink-0 rounded-xl bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 text-xs font-bold px-3 py-1.5 transition disabled:opacity-50"
+ >
+ {deletingPost === post.id ? '...' : 'Supprimer'}
+ </button>
+ </div>
+ </div>
+ );
+ })}
+ </div>
+ )}
  </div>
  )}
 
