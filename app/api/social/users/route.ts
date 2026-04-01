@@ -11,8 +11,18 @@ export async function GET(request: NextRequest) {
     const payload = verifyToken(token);
     if (!payload) return NextResponse.json({ error: 'Token invalide' }, { status: 401 });
 
+    const searchQuery = request.nextUrl.searchParams.get('query')?.trim() ?? '';
+
     const users = await prisma.user.findMany({
       take: 18,
+      where: searchQuery
+        ? {
+            OR: [
+              { pseudo: { contains: searchQuery, mode: 'insensitive' } },
+              { name: { contains: searchQuery, mode: 'insensitive' } },
+            ],
+          }
+        : undefined,
       orderBy: [{ xp: 'desc' }, { createdAt: 'desc' }],
       select: {
         id: true,

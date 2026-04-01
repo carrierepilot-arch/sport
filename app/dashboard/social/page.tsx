@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { UserAvatar } from '@/components/UserAvatar';
+import LevelBadge from '@/app/components/LevelBadge';
 
 type Tab = 'feed' | 'boite' | 'performances';
 
@@ -405,6 +406,12 @@ export default function SocialPage() {
   const [sendingMsg, setSendingMsg] = useState(false);
   const [msgError, setMsgError] = useState('');
   const [mobileMsgView, setMobileMsgView] = useState<'list' | 'chat'>('list');
+  const [convSearch, setConvSearch] = useState('');
+  const [userSearchResults, setUserSearchResults] = useState<SocialProfileCard[]>([]);
+  const [userSearchLoading, setUserSearchLoading] = useState(false);
+  const [friendReqLoading, setFriendReqLoading] = useState<string | null>(null);
+  const [friendReqSentIds, setFriendReqSentIds] = useState<Set<string>>(new Set());
+  const [respondingReqId, setRespondingReqId] = useState<string | null>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
   // Amis state
@@ -445,6 +452,23 @@ export default function SocialPage() {
   const [perfModalSubmitting, setPerfModalSubmitting] = useState(false);
   const [perfModalVideoProgress, setPerfModalVideoProgress] = useState<number | null>(null);
   const [perfModalError, setPerfModalError] = useState('');
+
+  // Spots state
+  type SpotItem = { id: string; name: string; city: string | null; _count: { performances: number; regulars: number } };
+  const [spots, setSpots] = useState<SpotItem[]>([]);
+  const [spotsLoading, setSpotsLoading] = useState(false);
+  const [spotSearch, setSpotSearch] = useState('');
+  const [spotFavorites, setSpotFavorites] = useState<Set<string>>(new Set());
+  const [spotFavLoading, setSpotFavLoading] = useState<string | null>(null);
+
+  // Add spot modal
+  const [showAddSpot, setShowAddSpot] = useState(false);
+  const [newSpotName, setNewSpotName] = useState('');
+  const [newSpotCity, setNewSpotCity] = useState('');
+  const [newSpotPhotos, setNewSpotPhotos] = useState<string[]>([]);
+  const [addSpotLoading, setAddSpotLoading] = useState(false);
+  const [addSpotError, setAddSpotError] = useState('');
+  const [addSpotSuccess, setAddSpotSuccess] = useState(false);
 
   const acceptedAmis = useMemo(
     () => amis.filter((a) => a.statut === 'accepte' || a.statut === 'accepted'),
@@ -501,6 +525,7 @@ export default function SocialPage() {
               friendId,
               pseudo: String(item.pseudo || 'ami'),
               nom: String(item.nom || item.pseudo || 'Ami'),
+              profileImageUrl: typeof item.profileImageUrl === 'string' ? item.profileImageUrl : undefined,
               statut,
             });
             return acc;
@@ -525,6 +550,59 @@ export default function SocialPage() {
     setProfilesLoading(false);
   }, []);
 
+  const sendFriendRequest = useCallback(async (pseudo: string, userId: string) => {
+    setFriendReqLoading(userId);
+    try {
+      const res = await fetch('/api/friends/send', {
+        method: 'POST',
+        headers: authHeader(),
+        body: JSON.stringify({ pseudo }),
+      });
+      if (res.ok) {
+        setFriendReqSentIds((prev) => new Set([...prev, userId]));
+        void loadAmis();
+      }
+    } catch {
+      // silent
+    }
+    setFriendReqLoading(null);
+  }, [loadAmis]);
+
+  const respondToFriendRequest = useCallback(async (requestId: string, action: 'accept' | 'reject') => {
+    setRespondingReqId(requestId);
+    try {
+      await fetch('/api/friends/respond', {
+        method: 'POST',
+        headers: authHeader(),
+        body: JSON.stringify({ requestId, action }),
+      });
+      void loadAmis();
+    } catch {
+      // silent
+    }
+    setRespondingReqId(null);
+  }, [loadAmis]);
+
+  useEffect(() => {
+    const q = convSearch.trim();
+    if (q.length < 2) {
+      setUserSearchResults([]);
+      return;
+    }
+    setUserSearchLoading(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/social/users?query=${encodeURIComponent(q)}`, { headers: authHeader() });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) setUserSearchResults(Array.isArray(data.users) ? data.users : []);
+      } catch {
+        setUserSearchResults([]);
+      }
+      setUserSearchLoading(false);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [convSearch]);
+
   const loadCommunityPerformances = useCallback(async () => {
     setCommunityLoading(true);
     try {
@@ -536,6 +614,84 @@ export default function SocialPage() {
     }
     setCommunityLoading(false);
   }, []);
+
+  const loadSpots = useCallback(async (city: string = '') => {
+    setSpotsLoading(true);
+    try {
+      const params = new URLSearchParams({ limit: '10' });
+      if (city.trim()) params.set('city', city.trim());
+      const res = await fetch(`/api/performances/spots?${params.toString()}`, { headers: authHeader() });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) setSpots(Array.isArray(data.spots) ? data.spots : []);
+    } catch {
+      // silent
+    }
+    setSpotsLoading(false);
+  }, []);
+
+  const loadSpotFavorites = useCallback(async () => {
+    try {
+      const res = await fetch('/api/performances/spots/favorites', { headers: authHeader() });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && Array.isArray(data.favoriteIds)) {
+        setSpotFavorites(new Set<string>(data.favoriteIds));
+      }
+    } catch {
+      // silent
+    }
+  }, []);
+
+  const toggleSpotFavorite = async (spotId: string) => {
+    if (spotFavLoading) return;
+    setSpotFavLoading(spotId);
+    const wasFav = spotFavorites.has(spotId);
+    setSpotFavorites((prev) => {
+      const next = new Set(prev);
+      if (wasFav) next.delete(spotId); else next.add(spotId);
+      return next;
+    });
+    try {
+      const res = await fetch('/api/performances/spots/favorites', {
+        method: 'POST',
+        headers: authHeader(),
+        body: JSON.stringify({ spotId }),
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      setSpotFavorites((prev) => {
+        const next = new Set(prev);
+        if (wasFav) next.add(spotId); else next.delete(spotId);
+        return next;
+      });
+    }
+    setSpotFavLoading(null);
+  };
+
+  const submitNewSpot = async () => {
+    if (!newSpotName.trim() || addSpotLoading) return;
+    setAddSpotLoading(true);
+    setAddSpotError('');
+    try {
+      const res = await fetch('/api/performances/spots', {
+        method: 'POST',
+        headers: authHeader(),
+        body: JSON.stringify({ name: newSpotName.trim(), city: newSpotCity.trim() || null, photoUrls: newSpotPhotos }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setAddSpotSuccess(true);
+        setNewSpotName('');
+        setNewSpotCity('');
+        setNewSpotPhotos([]);
+        setTimeout(() => { setShowAddSpot(false); setAddSpotSuccess(false); }, 2000);
+      } else {
+        setAddSpotError(typeof data.error === 'string' ? data.error : 'Erreur lors de la soumission.');
+      }
+    } catch {
+      setAddSpotError('Erreur réseau.');
+    }
+    setAddSpotLoading(false);
+  };
 
   const toggleFollow = async (profile: SocialProfileCard) => {
     if (followLoading) return;
@@ -581,7 +737,9 @@ export default function SocialPage() {
     void loadAmis();
     void loadPublicProfiles();
     void loadCommunityPerformances();
-  }, [loadFeed, loadConversations, loadAmis, loadPublicProfiles, loadCommunityPerformances]);
+    void loadSpots();
+    void loadSpotFavorites();
+  }, [loadFeed, loadConversations, loadAmis, loadPublicProfiles, loadCommunityPerformances, loadSpots, loadSpotFavorites]);
 
   const publishPost = async () => {
     if ((!composer.trim() && !composerImageUrl && !composerVideoUrl) || posting) return;
@@ -652,19 +810,17 @@ export default function SocialPage() {
       return;
     }
 
-    try {
-      const metadata = await readVideoMetadata(file);
-      if (metadata.duration > FEED_MAX_VIDEO_DURATION) {
-        setComposerError('La video doit durer 10 secondes maximum.');
-        e.target.value = '';
-        return;
-      }
+    if (file.size > 32 * 1024 * 1024) {
+      setComposerError('Video trop volumineuse (max 32 MB).');
+      e.target.value = '';
+      return;
+    }
 
+    try {
       setUploadingVideo(true);
-      setVideoProgress(0);
-      const preparedFile = await compressFeedVideo(file, setVideoProgress);
+      setVideoProgress(10);
       const formData = new FormData();
-      formData.append('video', preparedFile);
+      formData.append('video', file);
       const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
       const res = await fetch('/api/feed/upload-video', {
         method: 'POST',
@@ -681,7 +837,7 @@ export default function SocialPage() {
         setVideoProgress(null);
       }
     } catch {
-      setComposerError('Erreur pendant la preparation de la video.');
+      setComposerError('Erreur pendant l upload de la video.');
       setVideoProgress(null);
     }
 
@@ -1203,34 +1359,111 @@ export default function SocialPage() {
               ) : (
                 <div className="grid flex-1 gap-4 xl:grid-cols-[320px_minmax(0,1fr)_280px]">
                   <div className={`space-y-2 overflow-y-auto rounded-[28px] border border-slate-200 bg-slate-50 p-3 ${mobileMsgView === 'chat' ? 'hidden xl:block' : 'block'}`}>
-                    {conversations.length === 0 && (
+                    {/* Barre de recherche */}
+                    <div className="relative mb-2">
+                      <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                      <input
+                        value={convSearch}
+                        onChange={(e) => setConvSearch(e.target.value)}
+                        placeholder="Rechercher ou ajouter..."
+                        className="w-full pl-8 pr-3 py-2 rounded-xl border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-300"
+                      />
+                    </div>
+                    {conversations.length === 0 && !convSearch && (
                       <div className="p-4 rounded-xl border border-dashed border-gray-300 text-sm text-gray-500">
                         Aucune conversation existante.
                       </div>
                     )}
-                    {conversations.map((conv) => (
-                      <div key={conv.friendId} className={`p-4 rounded-xl border transition ${selectedConvFriendId === conv.friendId ? 'bg-sky-50 border-sky-300 shadow-md' : 'border-gray-200 hover:bg-gray-50'}`}>
-                        <div className="flex items-center gap-3 justify-between">
-                          <div className="flex items-center gap-3 flex-1 min-w-0">
-                            <Link href={`/dashboard/profil/${conv.friendId}`}>
-                              <UserAvatar src={conv.profileImageUrl} name={conv.pseudo} size="sm" />
-                            </Link>
-                            <div className="flex-1 min-w-0">
-                              <Link href={`/dashboard/profil/${conv.friendId}`} className="text-sm font-semibold text-gray-900 truncate hover:underline block">@{conv.pseudo}</Link>
-                              <p className="text-xs text-gray-500 break-words break-all line-clamp-2">{conv.dernier || 'Aucun message'}</p>
-                            </div>
+                    {conversations.filter(conv => !convSearch.trim() || conv.pseudo.toLowerCase().includes(convSearch.toLowerCase())).map((conv) => (
+                      <button
+                        key={conv.friendId}
+                        onClick={() => openConversation(conv.friendId)}
+                        className={`w-full text-left p-3 rounded-xl border transition ${selectedConvFriendId === conv.friendId ? 'bg-sky-50 border-sky-300 shadow-md' : 'border-gray-200 hover:bg-gray-50'}`}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <UserAvatar src={conv.profileImageUrl} name={conv.pseudo} size="sm" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold text-gray-900 truncate">@{conv.pseudo}</p>
+                            <p className="text-[11px] text-gray-500 truncate">{conv.dernier || 'Aucun message'}</p>
                           </div>
-                          <div className="text-right flex-shrink-0 ml-2">
-                            <p className="text-xs text-gray-400 whitespace-nowrap">{conv.heure}</p>
-                            {conv.nonLu > 0 && <span className="inline-block mt-1 px-2 py-1 text-xs font-bold bg-sky-500 text-white rounded-full">{conv.nonLu}</span>}
+                          <div className="flex-shrink-0 text-right">
+                            <p className="text-[11px] text-gray-400">{conv.heure}</p>
+                            {conv.nonLu > 0 && <span className="inline-block mt-0.5 px-1.5 py-0.5 text-[10px] font-bold bg-sky-500 text-white rounded-full">{conv.nonLu}</span>}
                           </div>
                         </div>
-                        <button onClick={() => openConversation(conv.friendId)} className="mt-3 w-full rounded-xl bg-sky-100 px-3 py-2 text-xs font-semibold text-sky-700 hover:bg-sky-200">Ouvrir la conversation</button>
-                      </div>
+                      </button>
                     ))}
+                    {convSearch.trim() && conversations.filter(conv => conv.pseudo.toLowerCase().includes(convSearch.toLowerCase())).length === 0 && !userSearchLoading && userSearchResults.length === 0 && (
+                      <div className="p-3 rounded-xl border border-dashed border-gray-300 text-xs text-gray-500 text-center">
+                        Aucune conversation trouvée. Recherche d&apos;utilisateurs...
+                      </div>
+                    )}
+                    {/* User search results */}
+                    {convSearch.trim().length >= 2 && (
+                      <div className="mt-1 space-y-1.5">
+                        {userSearchLoading && (
+                          <p className="px-2 text-xs text-gray-400">Recherche en cours...</p>
+                        )}
+                        {!userSearchLoading && userSearchResults.length > 0 && (
+                          <>
+                            <p className="px-1 text-[10px] font-bold uppercase tracking-widest text-gray-400">Utilisateurs</p>
+                            {userSearchResults.map((user) => {
+                              const alreadyFriend = amis.some(
+                                (a) => a.friendId === user.id && (a.statut === 'accepte' || a.statut === 'accepted'),
+                              );
+                              const pendingSent =
+                                amis.some((a) => a.friendId === user.id && (a.statut === 'en_attente' || a.statut === 'pending')) ||
+                                friendReqSentIds.has(user.id);
+                              const pendingReceived = amis.some((a) => a.friendId === user.id && a.statut === 'recu');
+                              return (
+                                <div
+                                  key={user.id}
+                                  className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white p-2.5"
+                                >
+                                  <UserAvatar src={user.profileImageUrl} name={user.pseudo} size="sm" />
+                                  <div className="min-w-0 flex-1">
+                                    <p className="truncate text-xs font-semibold text-gray-900">@{user.pseudo}</p>
+                                    <p className="truncate text-[11px] text-gray-400">{user.level} · {user.xp} XP</p>
+                                  </div>
+                                  {alreadyFriend ? (
+                                    <button
+                                      onClick={() => openConversation(user.id)}
+                                      className="rounded-lg bg-sky-100 px-2 py-1 text-xs font-semibold text-sky-700 hover:bg-sky-200"
+                                    >
+                                      Message
+                                    </button>
+                                  ) : pendingReceived ? (
+                                    <button
+                                      onClick={() => {
+                                        const req = amis.find((a) => a.friendId === user.id && a.statut === 'recu');
+                                        if (req) void respondToFriendRequest(req.id, 'accept');
+                                      }}
+                                      disabled={respondingReqId !== null}
+                                      className="rounded-lg bg-green-100 px-2 py-1 text-xs font-semibold text-green-700 hover:bg-green-200 disabled:opacity-50"
+                                    >
+                                      Accepter
+                                    </button>
+                                  ) : pendingSent ? (
+                                    <span className="text-[11px] text-gray-400">Demande envoyée</span>
+                                  ) : (
+                                    <button
+                                      onClick={() => void sendFriendRequest(user.pseudo, user.id)}
+                                      disabled={friendReqLoading === user.id}
+                                      className="rounded-lg bg-sky-100 px-2 py-1 text-xs font-semibold text-sky-700 hover:bg-sky-200 disabled:opacity-50"
+                                    >
+                                      {friendReqLoading === user.id ? '...' : 'Ajouter'}
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
 
-                  <div className={`min-h-[480px] overflow-hidden rounded-[28px] border border-slate-200 bg-white ${mobileMsgView === 'list' ? 'hidden xl:flex' : 'flex'} flex-col`}> 
+                  <div className={`h-[540px] sm:h-[640px] overflow-hidden rounded-[28px] border border-slate-200 bg-white ${mobileMsgView === 'list' ? 'hidden xl:flex' : 'flex'} flex-col`}> 
                     {!selectedConvFriendId ? (
                       <div className="flex-1 flex items-center justify-center text-sm text-gray-500 px-4 text-center bg-[linear-gradient(180deg,#ffffff,#f8fbff)]">
                         Sélectionne une conversation pour voir la discussion.
@@ -1253,7 +1486,7 @@ export default function SocialPage() {
                           })()}
                         </div>
 
-                        <div ref={chatContainerRef} className="flex-1 overflow-y-auto bg-[linear-gradient(180deg,#ffffff,#f8fbff)] p-4 pb-24 space-y-2">
+                        <div ref={chatContainerRef} className="flex-1 min-h-0 overflow-y-auto bg-[linear-gradient(180deg,#ffffff,#f8fbff)] p-4 space-y-2">
                           {chatLoading ? (
                             <p className="text-sm text-gray-500">Chargement des messages...</p>
                           ) : chat.length === 0 ? (
@@ -1276,25 +1509,26 @@ export default function SocialPage() {
                               {msgError}
                             </div>
                           )}
-                          <div className="flex items-center gap-2">
-                            <input
+                          <div className="flex items-end gap-2">
+                            <textarea
                               value={msgInput}
                               onChange={(e) => setMsgInput(e.target.value)}
                               placeholder="Message..."
+                              rows={3}
                               onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
+                                if (e.key === 'Enter' && !e.shiftKey) {
                                   e.preventDefault();
                                   void sendMessage();
                                 }
                               }}
-                              className="flex-1 px-3 py-2 rounded-xl border border-gray-200 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-300"
+                              className="flex-1 px-3 py-2 rounded-xl border border-gray-200 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-300 resize-none"
                             />
                             <button
                               onClick={() => void sendMessage()}
                               disabled={sendingMsg || chatLoading || !msgInput.trim()}
-                              className="px-4 py-2 rounded-xl bg-sky-600 text-white text-sm font-semibold disabled:opacity-50"
+                              className="px-3 py-2 rounded-xl bg-sky-600 text-white text-xs font-semibold disabled:opacity-50 flex-shrink-0"
                             >
-                              {sendingMsg ? 'Envoi...' : 'Envoyer'}
+                              {sendingMsg ? '...' : 'Envoyer'}
                             </button>
                           </div>
                         </div>
@@ -1303,6 +1537,49 @@ export default function SocialPage() {
                   </div>
 
                   <div className="grid gap-4 content-start">
+                    {/* Demandes reçues */}
+                    {amis.filter((a) => a.statut === 'recu').length > 0 && (
+                      <div className="rounded-[28px] border border-sky-200 bg-sky-50 p-4">
+                        <h3 className="text-sm font-black text-sky-900">
+                          Demandes reçues{' '}
+                          <span className="ml-1 rounded-full bg-sky-500 px-2 py-0.5 text-[11px] font-bold text-white">
+                            {amis.filter((a) => a.statut === 'recu').length}
+                          </span>
+                        </h3>
+                        <div className="mt-3 space-y-2">
+                          {amis
+                            .filter((a) => a.statut === 'recu')
+                            .map((req) => (
+                              <div key={req.id} className="rounded-xl border border-sky-100 bg-white p-3">
+                                <div className="flex items-center gap-3 mb-2">
+                                  <UserAvatar src={req.profileImageUrl} name={req.pseudo} size="sm" />
+                                  <div className="min-w-0 flex-1">
+                                    <p className="truncate text-sm font-semibold text-gray-900">@{req.pseudo}</p>
+                                    <p className="truncate text-xs text-gray-500">{req.nom}</p>
+                                  </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <button
+                                    onClick={() => void respondToFriendRequest(req.id, 'accept')}
+                                    disabled={respondingReqId === req.id}
+                                    className="rounded-xl bg-sky-600 px-3 py-2 text-xs font-semibold text-white hover:bg-sky-500 disabled:opacity-50"
+                                  >
+                                    {respondingReqId === req.id ? '...' : 'Accepter'}
+                                  </button>
+                                  <button
+                                    onClick={() => void respondToFriendRequest(req.id, 'reject')}
+                                    disabled={respondingReqId === req.id}
+                                    className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                                  >
+                                    Refuser
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    )}
+
                     <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-4">
                       <h3 className="text-sm font-black text-gray-900">Amis</h3>
                       <div className="mt-3 space-y-2">
@@ -1373,12 +1650,6 @@ export default function SocialPage() {
                   >
                     + Ajouter une performance
                   </button>
-                  <button
-                    onClick={() => setShowPerfModal(true)}
-                    className="w-full px-4 py-3 rounded-xl bg-white border border-sky-200 hover:border-sky-300 text-sky-700 text-sm font-semibold transition"
-                  >
-                    Enregistrer un nouveau record
-                  </button>
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2 mb-5">
@@ -1391,6 +1662,72 @@ export default function SocialPage() {
                     Les preuves video sont compressees cote client a 480p maximum dans l espace Performances pour rester legeres et directement exploitables pour la validation communautaire.
                   </p>
                 </div>
+              </div>
+
+              {/* Spots Section */}
+              <div className="rounded-3xl border border-gray-200 bg-white p-5 sm:p-6 shadow-sm">
+                <div className="flex items-center justify-between gap-3 mb-4">
+                  <div>
+                    <h3 className="text-base font-black text-gray-900">Streets &amp; Spots</h3>
+                    <p className="text-sm text-gray-500">Trouve un spot près de chez toi ou ajoute le tien.</p>
+                  </div>
+                  <button
+                    onClick={() => { setShowAddSpot(true); setAddSpotError(''); setAddSpotSuccess(false); }}
+                    className="shrink-0 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold px-3 py-2 transition"
+                  >
+                    + Ajouter
+                  </button>
+                </div>
+
+                {/* City Search */}
+                <div className="relative mb-3">
+                  <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+                  </svg>
+                  <input
+                    type="text"
+                    placeholder="Rechercher par ville..."
+                    value={spotSearch}
+                    onChange={(e) => {
+                      setSpotSearch(e.target.value);
+                      void loadSpots(e.target.value);
+                    }}
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 pl-9 pr-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-400"
+                  />
+                </div>
+
+                {/* Spots List with internal scroll */}
+                <div className="max-h-64 overflow-y-auto space-y-2 pr-1">
+                  {spotsLoading ? (
+                    <div className="py-6 text-center text-sm text-gray-400">Chargement...</div>
+                  ) : spots.length === 0 ? (
+                    <div className="py-6 text-center text-sm text-gray-400">
+                      {spotSearch.trim() ? `Aucun spot trouvé pour "${spotSearch}".` : 'Aucun spot approuvé pour l\'instant.'}
+                    </div>
+                  ) : (
+                    spots.map((spot) => (
+                      <div key={spot.id} className="flex items-center justify-between gap-3 rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-gray-900 truncate">{spot.name}</p>
+                          <p className="text-xs text-gray-500">{spot.city ?? 'Ville inconnue'} · {spot._count.performances} perf. · {spot._count.regulars} régulier{spot._count.regulars > 1 ? 's' : ''}</p>
+                        </div>
+                        <button
+                          onClick={() => void toggleSpotFavorite(spot.id)}
+                          disabled={spotFavLoading === spot.id}
+                          aria-label={spotFavorites.has(spot.id) ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+                          className={`shrink-0 p-2 rounded-xl transition ${spotFavorites.has(spot.id) ? 'text-amber-500 hover:text-amber-400' : 'text-gray-300 hover:text-amber-400'}`}
+                        >
+                          <svg className="w-5 h-5" viewBox="0 0 24 24" fill={spotFavorites.has(spot.id) ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                          </svg>
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+                {spots.length >= 10 && (
+                  <p className="mt-2 text-xs text-center text-gray-400">10 résultats max — affinez la recherche par ville</p>
+                )}
               </div>
 
               <div className="rounded-3xl border border-gray-200 bg-white p-5 sm:p-6 shadow-sm">
@@ -1415,7 +1752,7 @@ export default function SocialPage() {
                         <div className="flex items-start justify-between gap-3">
                           <div>
                             <Link href={`/dashboard/profil/${performance.author.id}`} className="text-sm font-bold text-gray-900 hover:underline block">@{performance.author.pseudo}</Link>
-                            <p className="text-xs text-gray-500">{performance.author.level} · {performance.author.xp} XP{performance.author.verified ? ' · verifie' : ''}</p>
+                            <LevelBadge xp={performance.author.xp} size="sm" />{performance.author.verified ? <span className="text-xs text-sky-600 font-bold"> verifie</span> : null}
                           </div>
                           <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold uppercase ${performance.status === 'validated' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
                             {performance.status === 'validated' ? 'validee' : 'a verifier'}
@@ -1462,6 +1799,106 @@ export default function SocialPage() {
           )}
         </div>
       </div>
+
+      {/* Add Spot Modal */}
+      {showAddSpot && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-3xl bg-white shadow-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-black text-gray-900">Proposer un spot</h2>
+                <p className="text-xs text-gray-500 mt-0.5">Soumis à validation avant publication.</p>
+              </div>
+              <button onClick={() => setShowAddSpot(false)} className="p-2 rounded-xl hover:bg-gray-100 text-gray-500 transition">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {addSpotSuccess ? (
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-5 text-center text-sm font-semibold text-emerald-700">
+                Spot soumis avec succès ! Il sera visible après validation.
+              </div>
+            ) : (
+              <>
+                {addSpotError && (
+                  <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{addSpotError}</div>
+                )}
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Nom du spot *</label>
+                  <input
+                    type="text"
+                    value={newSpotName}
+                    onChange={(e) => setNewSpotName(e.target.value)}
+                    placeholder="ex: Parc des Buttes-Chaumont"
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Ville</label>
+                  <input
+                    type="text"
+                    value={newSpotCity}
+                    onChange={(e) => setNewSpotCity(e.target.value)}
+                    placeholder="ex: Paris"
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Photos du spot (optionnel)</label>
+                  <label className="flex items-center gap-2 cursor-pointer rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 px-4 py-3 hover:bg-gray-100 transition">
+                    <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <span className="text-sm text-gray-500">Ajouter des photos ({newSpotPhotos.length}/3)</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      disabled={newSpotPhotos.length >= 3}
+                      onChange={async (e) => {
+                        const files = Array.from(e.target.files ?? []).slice(0, 3 - newSpotPhotos.length);
+                        for (const file of files) {
+                          const fd = new FormData();
+                          fd.append('image', file);
+                          try {
+                            const res = await fetch('/api/upload-image', { method: 'POST', headers: authHeader(), body: fd });
+                            const d = await res.json().catch(() => ({}));
+                            if (res.ok && d.imageUrl) setNewSpotPhotos((prev) => [...prev, d.imageUrl as string].slice(0, 3));
+                          } catch { /* silent */ }
+                        }
+                        e.target.value = '';
+                      }}
+                    />
+                  </label>
+                  {newSpotPhotos.length > 0 && (
+                    <div className="mt-2 flex gap-2 flex-wrap">
+                      {newSpotPhotos.map((url, i) => (
+                        <div key={i} className="relative">
+                          <img src={url} alt="" className="w-16 h-16 rounded-xl object-cover border border-gray-200" />
+                          <button
+                            onClick={() => setNewSpotPhotos((prev) => prev.filter((_, j) => j !== i))}
+                            className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center font-bold"
+                          >×</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <button
+                  onClick={() => void submitNewSpot()}
+                  disabled={addSpotLoading || !newSpotName.trim()}
+                  className="w-full rounded-xl bg-sky-600 hover:bg-sky-500 disabled:bg-gray-200 disabled:text-gray-400 text-white font-bold py-3 text-sm transition"
+                >
+                  {addSpotLoading ? 'Envoi...' : 'Proposer ce spot'}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Performance Modal */}
       {showPerfModal && (
