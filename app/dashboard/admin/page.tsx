@@ -542,9 +542,10 @@ export default function AdminPage() {
 	 try {
 		 const formData = new FormData();
 		 formData.append('image', file);
+		 const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 		 const uploadRes = await fetch('/api/feed/upload-image', {
 			 method: 'POST',
-			 headers: authHeader(),
+			 headers: token ? { Authorization: `Bearer ${token}` } : {},
 			 body: formData,
 		 });
 		 const uploadData = await uploadRes.json().catch(() => ({}));
