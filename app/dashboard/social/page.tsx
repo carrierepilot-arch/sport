@@ -1985,6 +1985,34 @@ export default function SocialPage() {
                 </div>
               </div>
 
+              {/* Lancer les Jeux Card */}
+              <div className="rounded-3xl bg-gradient-to-br from-violet-600 to-purple-700 p-5 sm:p-6 shadow-sm text-white">
+                <div className="flex items-start justify-between gap-4 mb-4">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-widest opacity-70 mb-1">Mini-jeux &amp; Defis</p>
+                    <h2 className="text-xl font-black mb-1">Lancer les jeux</h2>
+                    <p className="text-sm opacity-90">Defis solo, duels entre amis et mini-jeux. Teste tes limites et affronte la communaute.</p>
+                  </div>
+                  <div className="w-14 h-14 flex-shrink-0 rounded-2xl bg-white/20 flex items-center justify-center">
+                    <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <Link href="/dashboard/mini-jeux" className="flex flex-col items-center justify-center rounded-2xl bg-white/15 hover:bg-white/25 px-4 py-4 text-center transition">
+                    <svg className="w-6 h-6 mb-1.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                    <span className="text-sm font-bold text-white">Defis du jour</span>
+                    <span className="text-xs opacity-70 text-white">Solo</span>
+                  </Link>
+                  <Link href="/dashboard/mini-jeux?game=duel" className="flex flex-col items-center justify-center rounded-2xl bg-white/15 hover:bg-white/25 px-4 py-4 text-center transition">
+                    <svg className="w-6 h-6 mb-1.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                    <span className="text-sm font-bold text-white">Duel</span>
+                    <span className="text-xs opacity-70 text-white">Multijoueur</span>
+                  </Link>
+                </div>
+              </div>
+
               {/* Spots Section */}
               <div className="rounded-3xl border border-gray-200 bg-white p-5 sm:p-6 shadow-sm">
                 <div className="flex items-center justify-between gap-3 mb-4">

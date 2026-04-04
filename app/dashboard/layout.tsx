@@ -39,6 +39,90 @@ type SectionStatusPayload = {
  updatedAt: string;
 };
 
+const ONBOARDING_STEPS = [
+ {
+  title: 'Bienvenue sur Levelflow',
+  desc: 'Levelflow est la plateforme de street workout pour tracker ta progression, trouver des spots, et te mesurer a la communaute francaise.',
+  icon: 'M3 10.75L12 3l9 7.75M5.25 9.5V20a1 1 0 001 1h4.5v-6.5h2.5V21h4.5a1 1 0 001-1V9.5',
+  color: 'from-sky-500 to-blue-600',
+ },
+ {
+  title: 'Programmes IA',
+  desc: 'Va dans "Programmes" pour generer un entrainement sur mesure. L\'IA adapte le plan a ton niveau, tes objectifs et ton equipement disponible.',
+  icon: 'M13 10V3L4 14h7v7l9-11h-7z',
+  color: 'from-orange-500 to-red-500',
+ },
+ {
+  title: 'Skills & Tutoriels',
+  desc: 'Dans "Programmes" → onglet "Skills", retrouve des tutoriels pas-a-pas pour maitriser les figures du calisthenics : muscle up, planche, front lever et bien plus.',
+  icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
+  color: 'from-emerald-500 to-green-600',
+ },
+ {
+  title: 'Social & Communaute',
+  desc: 'Partage tes sessions sur le fil d\'actu, ajoute des amis, valide les performances de la communaute et trouve les meilleurs spots pres de chez toi.',
+  icon: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z',
+  color: 'from-violet-500 to-purple-600',
+ },
+ {
+  title: 'Classement National',
+  desc: 'Consulte le classement pour voir ta position sur chaque exercice, par ville et par spot. Soumets tes performances avec une video pour etre valide par la communaute.',
+  icon: 'M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z',
+  color: 'from-amber-500 to-yellow-500',
+ },
+ {
+  title: 'Jeux & Defis',
+  desc: 'La rubrique Jeux te propose des defis quotidiens, des duels entre athletes et des mini-jeux. Teste tes limites, affronte la communaute et monte dans le classement.',
+  icon: 'M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
+  color: 'from-pink-500 to-rose-600',
+ },
+];
+
+function GlobalOnboarding({ onClose }: { onClose: () => void }) {
+ const [step, setStep] = useState(0);
+ const current = ONBOARDING_STEPS[step];
+ return (
+  <div className="fixed inset-0 z-[3000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+  <div className="w-full max-w-sm rounded-3xl bg-white shadow-2xl overflow-hidden">
+   {/* Progress */}
+   <div className="flex gap-1 p-4 pb-0">
+   {ONBOARDING_STEPS.map((_, i) => (
+    <div key={i} className={`h-1 flex-1 rounded-full transition-all duration-300 ${i <= step ? 'bg-gray-900' : 'bg-gray-200'}`} />
+   ))}
+   </div>
+   {/* Icon */}
+   <div className="flex justify-center pt-6 pb-3">
+   <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${current.color} flex items-center justify-center shadow-lg`}>
+    <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+    <path strokeLinecap="round" strokeLinejoin="round" d={current.icon} />
+    </svg>
+   </div>
+   </div>
+   {/* Content */}
+   <div className="px-6 pb-2 text-center">
+   <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-1">{step + 1} / {ONBOARDING_STEPS.length}</p>
+   <h2 className="text-xl font-black text-gray-900 mb-3">{current.title}</h2>
+   <p className="text-sm text-gray-600 leading-relaxed">{current.desc}</p>
+   </div>
+   {/* Actions */}
+   <div className="flex items-center gap-3 px-6 py-5">
+   <button onClick={onClose} className="text-xs font-semibold text-gray-400 hover:text-gray-600 transition">Passer</button>
+   <div className="flex-1" />
+   {step < ONBOARDING_STEPS.length - 1 ? (
+    <button onClick={() => setStep(step + 1)} className="px-6 py-2.5 rounded-xl bg-gray-900 text-white text-sm font-bold hover:bg-gray-700 transition">
+    Suivant
+    </button>
+   ) : (
+    <button onClick={onClose} className={`px-6 py-2.5 rounded-xl bg-gradient-to-r ${current.color} text-white text-sm font-bold hover:shadow-lg transition`}>
+    Commencer
+    </button>
+   )}
+   </div>
+  </div>
+  </div>
+ );
+}
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
  const pathname = usePathname();
  const router = useRouter();
@@ -54,6 +138,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
  const [drawerOpen, setDrawerOpen] = useState(false);
  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
  const [sectionControls, setSectionControls] = useState<SectionStatusPayload[]>([]);
+ const [showGlobalOnboarding, setShowGlobalOnboarding] = useState(false);
 
  const applyUserFromStorage = useCallback((raw: string | null) => {
   if (!raw) return;
@@ -134,6 +219,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
    .catch(() => {
     setSectionControls([]);
    });
+ }, []);
+
+ // Lancer l'onboarding pour les nouveaux utilisateurs
+ useEffect(() => {
+  const timer = setTimeout(() => {
+  if (typeof window !== 'undefined') {
+   const done = localStorage.getItem('global_onboarding_done');
+   if (!done) setShowGlobalOnboarding(true);
+  }
+  }, 1200);
+  return () => clearTimeout(timer);
  }, []);
 
  // Charger les infos utilisateur depuis localStorage
@@ -268,6 +364,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
  return (
  <div className="min-h-screen bg-[var(--ios-bg)] flex overflow-x-hidden apple-dashboard">
+
+ {/* Global Onboarding Tutoriel */}
+ {showGlobalOnboarding && (
+  <GlobalOnboarding onClose={() => {
+  setShowGlobalOnboarding(false);
+  if (typeof window !== 'undefined') localStorage.setItem('global_onboarding_done', '1');
+  }} />
+ )}
 
  {/* MOBILE HEADER */}
  <header className="md:hidden fixed top-0 inset-x-0 z-[1500] h-14 ios-nav-glass flex items-center px-4 gap-3 shadow-sm">

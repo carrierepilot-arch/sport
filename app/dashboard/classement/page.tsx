@@ -241,6 +241,36 @@ export default function ClassementPage() {
  {/* Content */}
  <div className="max-w-2xl mx-auto w-full px-3 sm:px-4 md:px-8 py-5 sm:py-6 space-y-4 overflow-x-hidden">
 
+ {/* Bloc explicatif */}
+ <div className="rounded-2xl border border-sky-100 bg-sky-50 p-4 sm:p-5">
+  <div className="flex items-start gap-3">
+  <div className="w-9 h-9 flex-shrink-0 rounded-full bg-sky-100 flex items-center justify-center">
+   <svg className="w-5 h-5 text-sky-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+  </div>
+  <div className="space-y-2.5">
+   <h3 className="text-sm font-black text-sky-900">Comment fonctionne le classement ?</h3>
+   <div className="space-y-2 text-xs text-sky-900 leading-relaxed">
+   <div className="flex gap-2">
+    <span className="font-bold shrink-0">Categories :</span>
+    <span>Chaque onglet correspond a un exercice independant (tractions, pompes, dips, muscle-ups...). Tu as un classement distinct pour chaque mouvement.</span>
+   </div>
+   <div className="flex gap-2">
+    <span className="font-bold shrink-0">Performances :</span>
+    <span>Seuls tes meilleurs scores valides sont pris en compte. Chaque performance doit etre accompagnee d&apos;une preuve video et validee par la communaute avant d&apos;apparaitre au classement.</span>
+   </div>
+   <div className="flex gap-2">
+    <span className="font-bold shrink-0">Echelle nationale :</span>
+    <span>Tu es compare a tous les athletes inscrits en France. Le systeme Elo ajuste ton score selon le niveau des adversaires depasses ou surclasses par rapport a toi.</span>
+   </div>
+   <div className="flex gap-2">
+    <span className="font-bold shrink-0">Par ville &amp; lieu :</span>
+    <span>Filtre le classement pour voir les meilleurs de ta ville ou de ton spot. Represente ta region et grimpe dans le top local.</span>
+   </div>
+   </div>
+  </div>
+  </div>
+ </div>
+
  {/* View mode selector */}
  <div className="flex gap-2 bg-gray-100 rounded-2xl p-1">
  {([

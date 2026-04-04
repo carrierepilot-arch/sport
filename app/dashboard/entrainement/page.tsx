@@ -1073,6 +1073,54 @@ function inferSessionType(text: string): SessionType {
 
 const TUTOS = [
  {
+ id: 'tractions-debutant',
+ title: 'Tractions (débutant)',
+ level: 'Débutant',
+ levelColor: 'bg-green-100 text-green-700',
+ description: 'Apprendre la traction stricte depuis zéro. Mouvement fondamental du street workout, accessible a tous sans matériel sauf une barre.',
+ muscles: ['Dorsaux', 'Biceps', 'Avant-bras', 'Abdominaux'],
+ etapes: [
+ { titre: 'Comprendre le mouvement', contenu: 'La traction (pull-up) consiste a se suspendre a une barre et a monter le corps jusqu\'a ce que le menton depasse la barre. C\'est le mouvement de traction vertical de base du street workout.' },
+ { titre: 'Prérequis', contenu: 'Pratiquer le dead hang (suspension passive) : tenir 30 sec minimum. Faire des rangees inversees (rows) sous une barre basse. Ces exercices preparent les tendons et les epaules.' },
+ { titre: 'Progressions étape par étape', contenu: '1. Dead hang 3x30 sec -> 2. Scapular pulls (hausser les epaules en suspension) 3x10 -> 3. Tractions assistees (elastique ou partenaire) 3x8 -> 4. Negatives (descente lente 5 sec) 3x5 -> 5. Traction complete.' },
+ { titre: 'Technique stricte', contenu: 'Saisir la barre en pronation, largeur d\'epaules. Decoller les scapulas, puis tirer les coudes vers les hanches. Monter jusqu\'au menton au-dessus de la barre. Corps droit, pas de balancement. Descendre en controlant chaque millimetre.' },
+ { titre: 'Volume débutant', contenu: '3 seances par semaine max. Semaine 1 : 3x5 negatives + 3x30 sec dead hang. Semaine 4 : viser 1-3 tractions completes. Mois 2 : 5 tractions propres. Mois 3 : 10 tractions.' },
+ { titre: 'Erreurs fréquentes', contenu: 'Ne pas "kiper" (se balancer) avant de maitriser la forme stricte. Eviter de laisser les epaules remonter vers les oreilles. Toujours descendre completement (full ROM). Ne pas forcer si douleur aux coudes ou epaules.' },
+ ],
+ },
+ {
+ id: 'pompes-debutant',
+ title: 'Pompes (débutant)',
+ level: 'Débutant',
+ levelColor: 'bg-green-100 text-green-700',
+ description: 'Base de la poussée en calisthenics. Développe les pectoraux, triceps et épaules. Point de départ de toutes les variantes poussée avancées.',
+ muscles: ['Pectoraux', 'Triceps', 'Épaules', 'Abdominaux'],
+ etapes: [
+ { titre: 'Comprendre le mouvement', contenu: 'La pompe (push-up) est un exercice de poussee au sol fondamental. Corps rigide comme une planche, bras qui poussent contre le sol. Indispensable avant toute variante avancee (planche, HSPU, etc.).' },
+ { titre: 'Prérequis', contenu: 'Aucun prerequis. Les pompes sont accessibles a tous. Si tu ne peux pas faire 1 pompe complete, commence par les pompes au mur puis a genoux. Tu progresseras rapidement.' },
+ { titre: 'Progressions étape par étape', contenu: '1. Pompes au mur (incline) 3x15 -> 2. Pompes a genoux 3x12 -> 3. Pompes au sol form completes 3x5 -> 4. Pompes pieds sur elevation 3x10 -> 5. Pompes lestees ou variantes.' },
+ { titre: 'Technique parfaite', contenu: 'Mains legerement plus larges que les epaules. Corps aligne de la tete aux talons (gainage abdominal serré). Descendre jusqu\'a ce que la poitrine effleure le sol. Pousser en expirant. Coudes a 45° par rapport au corps (ni trop ecartes, ni colles).' },
+ { titre: 'Volume débutant', contenu: 'Semaine 1 : 3x5 pompes completes. Progresser de +2 reps par semaine. Mois 1 : 3x20. Mois 2 : 50 pompes enchainées. A ce stade tu peux commencer les variantes archer et pseudo-planche.' },
+ { titre: 'Erreurs fréquentes', contenu: 'Dos cambre (hanches qui tombent), fesses qui remontent, amplitude incomplete (ne pas toucher le sol), coudes trop ecartes a 90°. Toujours maintenir le gainage et aller jusqu\'au bout du mouvement.' },
+ ],
+ },
+ {
+ id: 'dips-debutant',
+ title: 'Dips (débutant)',
+ level: 'Débutant',
+ levelColor: 'bg-green-100 text-green-700',
+ description: 'Exercice de poussée aux barres parallèles. Développe triceps, pectoraux et épaules. Indispensable pour progresser vers les mouvements de poussée avancés.',
+ muscles: ['Triceps', 'Pectoraux', 'Épaules'],
+ etapes: [
+ { titre: 'Comprendre le mouvement', contenu: 'Le dip est execute aux barres paralleles ou entre deux surfaces solides. On descend en pliant les bras, puis on pousse pour revenir en position haute. Excellent pour la force de poussee du haut du corps.' },
+ { titre: 'Prérequis', contenu: 'Maitriser 10 pompes au sol strictes avant de commencer les dips. L\'epaule doit etre suffisamment forte pour supporter le poids du corps en position basse.' },
+ { titre: 'Progressions étape par étape', contenu: '1. Dips sur chaise assistés (pieds au sol) 3x10 -> 2. Jumping dips (amorti par les jambes a la remontee) 3x8 -> 3. Negative dips (descente lente 4 sec) 3x5 -> 4. Dip complet 3x5 -> 5. Dips lestes.' },
+ { titre: 'Technique correcte', contenu: 'Monter aux barres en support, bras tendus. Incliner legerement le buste vers l\'avant. Descendre d\'abord les coudes, jusqu\'a ce que les epaules soient au niveau des coudes (90° mini). Pousser jusqu\'a extension complete. Ne pas laisser les epaules plonger.' },
+ { titre: 'Volume débutant', contenu: 'Mois 1 : viser 3x5 dips complets. Semaine +1 : +2 reps. Mois 2 : 3x15. Mois 3 : 3x20. Apres 20 dips propres, commencer les variantes lestees ou aux anneaux.' },
+ { titre: 'Erreurs fréquentes', contenu: 'S\'incliner trop vers l\'avant (charge excessive pecs + risque epaule). Pas assez descendre (amplitude partielle). Epaules trop basses en bas du mouvement (impingement). Coudes qui partent en dehors.' },
+ ],
+ },
+ {
  id: 'front-lever',
  title: 'Front Lever',
  level: 'Avancé',
@@ -1316,7 +1364,17 @@ const TUTOS = [
 
 function TutoTab() {
  const [modal, setModal] = useState<{ id: string; step: number } | null>(null);
+ const [filterLevel, setFilterLevel] = useState<string | null>(null);
+ const [searchQuery, setSearchQuery] = useState('');
  const tuto = modal ? TUTOS.find((t) => t.id === modal.id) ?? null : null;
+
+ const LEVELS = ['Débutant', 'Intermédiaire', 'Avancé', 'Expert'];
+ const filtered = TUTOS.filter((t) => {
+ const matchLevel = !filterLevel || t.level === filterLevel;
+ const q = searchQuery.toLowerCase();
+ const matchSearch = !q || t.title.toLowerCase().includes(q) || t.description.toLowerCase().includes(q) || t.muscles.some((m) => m.toLowerCase().includes(q));
+ return matchLevel && matchSearch;
+ });
 
  return (
  <div className="space-y-5">
@@ -1325,8 +1383,64 @@ function TutoTab() {
  <p className="text-sm text-gray-500">Maitrisez les mouvements emblematiques du calisthenics, etape par etape.</p>
  </div>
 
+ {/* Parcours debutant */}
+ <div className="rounded-2xl bg-gradient-to-br from-emerald-600 to-green-700 text-white p-5 shadow-sm">
+ <p className="text-xs font-bold uppercase tracking-widest opacity-70 mb-1">Parcours recommande</p>
+ <h3 className="text-base font-black mb-2">Tu debutes ? Commence ici</h3>
+ <p className="text-sm opacity-90 mb-4">Tractions, pompes, dips. Maitrise les bases avant de passer aux figures avancees.</p>
+ <div className="flex gap-2 flex-wrap">
+ {['tractions-debutant', 'pompes-debutant', 'dips-debutant'].map((id) => {
+ const t = TUTOS.find((x) => x.id === id);
+ if (!t) return null;
+ return (
+ <button key={id} onClick={() => setModal({ id, step: 0 })} className="px-3 py-1.5 rounded-xl bg-white/20 text-white text-xs font-semibold hover:bg-white/30 transition">
+ {t.title}
+ </button>
+ );
+ })}
+ </div>
+ </div>
+
+ {/* Recherche + Filtres */}
+ <div className="space-y-3">
+ <input
+ type="text"
+ placeholder="Rechercher un mouvement, un muscle..."
+ value={searchQuery}
+ onChange={(e) => setSearchQuery(e.target.value)}
+ className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300"
+ />
+ <div className="flex gap-2 flex-wrap">
+ <button
+ onClick={() => setFilterLevel(null)}
+ className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition ${!filterLevel ? 'bg-gray-900 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+ >
+ Tous ({TUTOS.length})
+ </button>
+ {LEVELS.map((lv) => {
+ const count = TUTOS.filter((t) => t.level === lv).length;
+ return (
+ <button
+ key={lv}
+ onClick={() => setFilterLevel(filterLevel === lv ? null : lv)}
+ className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition ${filterLevel === lv ? 'bg-gray-900 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+ >
+ {lv} ({count})
+ </button>
+ );
+ })}
+ </div>
+ </div>
+
+ {filtered.length === 0 && (
+ <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-8 text-center">
+ <p className="text-sm font-semibold text-gray-600">Aucun resultat pour &ldquo;{searchQuery}&rdquo;</p>
+ <button onClick={() => { setSearchQuery(''); setFilterLevel(null); }} className="mt-2 text-xs text-sky-600 font-semibold hover:underline">Reinitialiser les filtres</button>
+ </div>
+ )}
+
  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
- {TUTOS.map((t) => (
+ {filtered.map((t) => (
  <div key={t.id} className="flex flex-col rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
  <div className="flex-1 p-5 space-y-3">
  <div className="flex items-center justify-between gap-2">
