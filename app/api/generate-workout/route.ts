@@ -413,8 +413,16 @@ ${equipements?.length ? `L'utilisateur possède aussi du matériel personnel : $
  : Math.max(4, Math.round(sessionMinutes / avgMinPerExercice));
 
  const dureeConstraint = `\n\nCONTRAINTE DUREE DE SEANCE (TRES IMPORTANT - RESPECTER ABSOLUMENT) :
-La seance DOIT durer EXACTEMENT ${sessionMinutes} minutes.
-Pour atteindre cette duree, chaque jour DOIT contenir entre ${targetExercices - 1} et ${targetExercices + 2} exercices.`;
+La seance DOIT durer EXACTEMENT ${sessionMinutes} minutes reellement (pas sur le papier, en pratique).
+Pour atteindre cette duree, chaque jour DOIT contenir entre ${targetExercices} et ${targetExercices + 3} exercices.
+Calcul obligatoire : (series x reps x temps_par_rep) + (repos entre series) + (echauffement ~10min) + (retour au calme ~5min) = ${sessionMinutes} min.
+${sessionMinutes >= 90 ? `Pour une seance de ${sessionMinutes}min, la structure OBLIGATOIRE est :
+- Echauffement (8-12 min) : mobilite articulaire + activation musculaire + montee en temperature
+- Bloc principal (${Math.round(sessionMinutes * 0.5)}-${Math.round(sessionMinutes * 0.6)} min) : exercices composes lourds / skills
+- Bloc accessoire (15-20 min) : exercices complementaires et isolation
+- Travail technique / skill (10-15 min) : progressions specifiques si figures selectionnees
+- Finisher (5-8 min) : circuit intense court OU etirements actifs
+Ne PAS se contenter de 5 exercices x 3 series pour remplir 90 min. Inclure TOUTES les phases.` : `Structure recommandee : echauffement (5 min), bloc principal, retour au calme.`}`;
 
  const dureeMap: Record<string, number> = {
  '1_semaine': 1, '2_semaines': 2, '1_mois': 4, '2_mois': 8, '3_mois': 12,
@@ -432,13 +440,98 @@ Pour atteindre cette duree, chaque jour DOIT contenir entre ${targetExercices - 
  const latestPhysicalEntry = Array.isArray(userProfile?.physicalData) && userProfile.physicalData.length > 0
  ? userProfile.physicalData[userProfile.physicalData.length - 1] as Record<string, unknown>
  : null;
- const enduranceResults = Array.isArray(levelTestData?.resultats) ? levelTestData.resultats as unknown[] : [];
+
+ // Extract all test data for detailed profile
+ const testExercices = Array.isArray(levelTestData?.exercices) ? levelTestData.exercices as string[] : [];
+ const testResultats = Array.isArray(levelTestData?.resultats) ? levelTestData.resultats as unknown[] : [];
+ const testTypeData = typeof levelTestData?.testType === 'string' ? levelTestData.testType : null;
+ const forceRMTypeData = typeof levelTestData?.forceRMType === 'string' ? levelTestData.forceRMType : null;
+ const forceRepsPerExoData = Array.isArray(levelTestData?.forceRepsPerExo) ? levelTestData.forceRepsPerExo as number[] : [];
  const manualForceData = levelTestData?.manualForce && typeof levelTestData.manualForce === 'object'
  ? levelTestData.manualForce as Record<string, unknown>
  : null;
- const profileContext = `\n\nPROFIL ATHLETE :
-- Niveau enregistre : ${userProfile?.level || 'intermediaire'}${typeof levelTestData?.manualLevel === 'string' ? `\n- Niveau declare au test : ${String(levelTestData.manualLevel)}` : ''}${typeof levelTestData?.detectedLevel === 'string' ? `\n- Niveau detecte au test : ${String(levelTestData.detectedLevel)}` : ''}${enduranceResults.length ? `\n- Resultats test endurance : ${enduranceResults.map((value, index) => `${index + 1}:${String(value)}`).join(', ')}` : ''}${manualForceData ? `\n- Force lestee declaree : ${Object.entries(manualForceData).map(([key, value]) => `${key}=${String(value)}`).join(', ')}` : ''}${latestPhysicalEntry ? `\n- Dernieres donnees physiques : ${Object.entries(latestPhysicalEntry).filter(([, value]) => value !== null && value !== '').map(([key, value]) => `${key}=${String(value)}`).join(', ')}` : ''}
-Utilise IMPERATIVEMENT ces donnees pour calibrer la difficulte, le volume, la progression et les variantes.`;
+
+ // Build detailed test results for the prompt
+ let testDetailsStr = '';
+ if (testTypeData === 'endurance' && testExercices.length) {
+ testDetailsStr = `\n- TEST ENDURANCE realise : ${testExercices.map((ex, i) => `${ex}=${testResultats[i] ?? 0} reps`).join(', ')}`;
+ } else if (testTypeData === 'force' && testExercices.length) {
+ testDetailsStr = `\n- TEST FORCE (${forceRMTypeData || '1RM'}) realise :`;
+ testExercices.forEach((ex, i) => {
+ const kg = testResultats[i] ?? 0;
+ const reps = forceRepsPerExoData[i] ?? 1;
+ const estimated1RM = Number(reps) > 1 ? Math.round(Number(kg) * (1 + Number(reps) / 30) * 10) / 10 : Number(kg);
+ testDetailsStr += `\n  ${ex}: ${kg}kg x ${reps} reps (1RM estime: ${estimated1RM}kg)`;
+ });
+ } else if (testTypeData === 'statique' && testExercices.length) {
+ testDetailsStr = `\n- TEST POSITIONNEL realise : ${testExercices.map((ex, i) => `${ex}=${testResultats[i] ?? 0}s`).join(', ')}`;
+ }
+ if (manualForceData) {
+ const entries = Object.entries(manualForceData).filter(([, v]) => Number(v) > 0);
+ if (entries.length) {
+ testDetailsStr += `\n- CHARGES LESTEES declarees : ${entries.map(([k, v]) => `${k}=${String(v)}kg`).join(', ')}`;
+ }
+ }
+
+ const profileContext = `\n\nPROFIL ATHLETE (UTILISER IMPERATIVEMENT pour calibrer le programme) :
+- Niveau enregistre : ${userProfile?.level || 'intermediaire'}${typeof levelTestData?.manualLevel === 'string' ? `\n- Niveau declare : ${String(levelTestData.manualLevel)}` : ''}${typeof levelTestData?.detectedLevel === 'string' ? `\n- Niveau detecte par IA : ${String(levelTestData.detectedLevel)}` : ''}${testDetailsStr}${latestPhysicalEntry ? `\n- Donnees physiques : ${Object.entries(latestPhysicalEntry).filter(([, value]) => value !== null && value !== '').map(([key, value]) => `${key}=${String(value)}`).join(', ')}` : ''}
+
+REGLES D'ADAPTATION AU NIVEAU :
+- DEBUTANT : exercices simples (pompes genoux, tractions assistees, squats poids du corps), series courtes (2-3), repos longs (2-3 min), volume modere
+- INTERMEDIAIRE : exercices standards + variantes, series moyennes (3-4), repos moyens (90s-2min), volume moyen-haut
+- ELITE : exercices avances (lestes, unilateraux, plyometriques), series elevees (4-5), repos adaptes a l'objectif, volume haut
+- Si des charges 1RM sont fournies, calibrer les poids de travail a 60-75% pour l'hypertrophie, 80-90% pour la force, 40-60% pour l'endurance`;
+
+ // Rest time logic based on objective
+ const objectifLower = (objectif || '').toLowerCase();
+ let restTimeConstraint = `\n\nCONTRAINTE TEMPS DE REPOS (TRES IMPORTANT - VARIER selon l'exercice et l'objectif) :`;
+ if (objectifLower.includes('force')) {
+ restTimeConstraint += `
+Objectif FORCE : repos entre 3min et 5min pour les exercices composes lourds (tractions lestees, dips lestes, squats).
+Repos 2-3min pour les exercices accessoires. Ne JAMAIS mettre 90s sur un exercice de force pure.`;
+ } else if (objectifLower.includes('hypertrophie')) {
+ restTimeConstraint += `
+Objectif HYPERTROPHIE : repos entre 60s et 120s selon l'exercice.
+Exercices composes (tractions, dips, squats) : 90s-120s. Exercices d'isolation : 60s-90s.`;
+ } else if (objectifLower.includes('endurance')) {
+ restTimeConstraint += `
+Objectif ENDURANCE : repos courts entre 30s et 60s.
+Circuit ou series enchainées avec repos minimal. Favoriser les enchainements rapides.`;
+ } else if (objectifLower.includes('cardio')) {
+ restTimeConstraint += `
+Objectif CARDIO : repos entre 15s et 45s.
+Enchainements rapides type HIIT. Repos actifs si possible (marche, gainage leger).`;
+ } else {
+ restTimeConstraint += `
+Adapter les repos selon le type d'exercice :
+- Exercices composes lourds (tractions, dips, squats) : 2min-3min
+- Exercices au poids du corps standard : 90s-2min
+- Exercices d'isolation ou finition : 60s-90s
+- Circuit / cardio : 30s-60s`;
+ }
+ restTimeConstraint += `\nNe JAMAIS mettre un repos generique "90s" pour tous les exercices. CHAQUE exercice doit avoir un repos adapte.`;
+
+ const equipmentStrictConstraint = equipements?.length
+ ? `\n\nCONTRAINTE EQUIPEMENT (ABSOLUE - ZERO TOLERANCE) :
+L'utilisateur a declare posseder UNIQUEMENT : ${equipStr}.
+Tu ne dois JAMAIS proposer un equipement que l'utilisateur n'a PAS selectionne.
+${lieu === 'Street workout' ? 'Pas d\'halteres, pas de kettlebells, pas de machines, pas de banc sauf si declare.' : ''}
+${lieu === 'Maison' ? 'Pas de machines de salle sauf si declarees.' : ''}
+Si un exercice necessite un equipement non declare, remplace-le par une alternative au poids du corps ou avec l\'equipement declare.
+VERIFICATION : pour CHAQUE exercice, verifie qu\'il est realisable avec les equipements declares.`
+ : `\n\nCONTRAINTE EQUIPEMENT : L'utilisateur n'a declare AUCUN equipement. Tous les exercices doivent etre realisables sans materiel (poids du corps uniquement)${lieu === 'Street workout' ? ', avec une barre de traction et des barres paralleles' : ''}.`;
+
+ const levelCoherenceConstraint = `\n\nCONTRAINTE NIVEAU (ABSOLUE - ZERO TOLERANCE) :
+Le niveau reel de l'utilisateur est : ${userProfile?.level || 'intermediaire'}.
+${testDetailsStr ? `Donnees de test : ${testDetailsStr}` : ''}
+REGLES STRICTES :
+1. INTERDICTION de proposer des exercices PLUS FACILES que le niveau reel. Un athlete elite ne doit JAMAIS avoir de pompes genoux ou tractions assistees.
+2. Pour un debutant : PAS de muscle-up, PAS de front lever, PAS de planche. Exercices fondamentaux uniquement.
+3. Pour un intermediaire : variantes standards + introduction progressive aux skills.
+4. Pour un elite : exercices avances, lestes, unilateraux, plyometriques, skills avancees.
+5. Les repetitions doivent correspondre au niveau : debutant (8-15 reps simples), intermediaire (6-12 reps moderees), elite (3-8 reps lourdes/complexes).
+6. Le volume total doit progresser avec le niveau : debutant (volume modere), elite (volume haut).`;
+
  const multiWeekCompactness = isLongProgramme
  ? `\n\nCONTRAINTE DE SORTIE LONGUE DUREE :
 Programme long (${nbSemaines} semaines). Reste compact et exploitable :
@@ -455,7 +548,7 @@ Programme long (${nbSemaines} semaines). Reste compact et exploitable :
  ? `\nIMPORTANT: Reponds UNIQUEMENT en JSON valide (pas de texte avant ni apres, pas de commentaires). Structure OBLIGATOIRE avec "semaines" TABLEAU de ${nbSemaines} objets, chaque objet ayant "semaine" (nombre), "description" (string), "jours" TABLEAU d'objets avec "jour","focus","exercices". Chaque exercice doit avoir "nom","series" (nombre), "reps" (string ex: "8-10"), "repos" (string ex: "90s"), "conseil" (string optionnel). Schema: ${multiWeekSchema}`
  : `\nIMPORTANT: Reponds UNIQUEMENT en JSON valide (pas de texte avant ni apres, pas de commentaires). Structure OBLIGATOIRE: "jours" DOIT etre un TABLEAU (array) d'objets, jamais un objet/dictionnaire. Chaque objet jour doit avoir "jour" (nom du jour), "focus" (string), "exercices" (TABLEAU). Chaque exercice doit avoir "nom","series" (nombre), "reps" (string ex: "8-10"), "repos" (string ex: "90s"), "conseil" (string optionnel). Schema: ${singleWeekSchema}`;
 
- const prompt = `Tu es un coach de street workout et fitness expert. Cree un programme d'entrainement personnalise et detaille en francais.${lieuConstraint}${dureeConstraint}${progressionConstraint}${multiWeekCompactness}${profileContext}
+ const prompt = `Tu es un coach de street workout et fitness expert. Cree un programme d'entrainement personnalise et detaille en francais.${lieuConstraint}${dureeConstraint}${progressionConstraint}${restTimeConstraint}${equipmentStrictConstraint}${levelCoherenceConstraint}${multiWeekCompactness}${profileContext}
 
 Informations de l'utilisateur :
 - Objectif principal : ${objectif || 'general'}
@@ -466,7 +559,13 @@ Informations de l'utilisateur :
 - Figures statiques travaillees : ${figuresStr}
 - Muscles a developper en priorite : ${musclesStr}
 - Duree souhaitee de la seance : ${tempsSeance || 'non precise'}
-- Duree du programme : ${nbSemaines} semaine(s)${pointsDouleur?.length ? `\n- Points de douleur / blessures : ${pointsDouleur.join(', ')}` : ''}${musclesRetard?.length ? `\n- Muscles en retard a prioriser : ${musclesRetard.join(', ')}` : ''}${lieuParJour && Object.keys(lieuParJour).length > 0 ? `\n- Lieu par jour : ${Object.entries(lieuParJour).map(([j, l]) => `${j} -> ${l}`).join(', ')}` : ''}${exoContext}${scienceContext}
+- Duree du programme : ${nbSemaines} semaine(s)${pointsDouleur?.length ? `\n- Points de douleur / blessures : ${pointsDouleur.join(', ')}` : ''}${musclesRetard?.length ? `\n- Muscles en retard a prioriser : ${musclesRetard.join(', ')}` : ''}${lieuParJour && Object.keys(lieuParJour).length > 0 ? `\n- Lieu par jour : ${Object.entries(lieuParJour).map(([j, l]) => `${j} -> ${l}`).join(', ')}` : ''}${figuresSelectees?.length ? `\n\nINSTRUCTIONS SKILLS SPECIFIQUES :
+Pour chaque figure selectionnee, ajouter dans les seances :
+- Exercices techniques directement lies a la progression de la figure
+- Renforcement cible des muscles requis pour cette figure
+- Echauffement specifique articulaire et musculaire
+- Conseil de progression adapte au niveau actuel de la figure
+Exemple : pour Front Lever niveau "Tuck", inclure des tuck front lever holds, ice cream makers, scapula pulls, et du renforcement dos/abdos.` : ''}${exoContext}${scienceContext}
 ${formatInstruction}`;
 
  const nbJours = joursSelectes?.length || frequence || 3;

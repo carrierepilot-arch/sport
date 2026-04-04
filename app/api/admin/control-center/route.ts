@@ -4,6 +4,8 @@ import {
   getAdminControlConfig,
   patchRateLimitConfig,
   patchSectionControl,
+  patchFeedLock,
+  patchMessagingLock,
   SectionStatus,
 } from '@/lib/admin-control-config';
 import { logAdminAction, requireAdminPermission } from '@/lib/admin-auth';
@@ -81,29 +83,49 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  const admin = await requireAdminPermission(request, 'control:write');
+  let admin: Awaited<ReturnType<typeof requireAdminPermission>>;
+  try {
+    admin = await requireAdminPermission(request, 'control:write');
+  } catch {
+    return NextResponse.json({ error: 'Erreur d\'authentification' }, { status: 500 });
+  }
   if (!admin) return NextResponse.json({ error: 'Acces refuse' }, { status: 403 });
 
   const body = (await request.json().catch(() => ({}))) as {
     sectionUpdates?: Array<{ key?: string; status?: SectionStatus; maintenanceMessage?: string | null }>;
     rateLimit?: { enabled?: boolean; maxRequests?: number; windowMs?: number; mutatingOnly?: boolean };
+    feedLocked?: boolean;
+    messagingLocked?: boolean;
   };
 
   let config = await getAdminControlConfig();
 
-  if (Array.isArray(body.sectionUpdates)) {
-    for (const update of body.sectionUpdates) {
-      if (!update?.key) continue;
-      if (!update.status) continue;
-      config = await patchSectionControl(update.key, {
-        status: update.status,
-        maintenanceMessage: typeof update.maintenanceMessage === 'string' ? update.maintenanceMessage : undefined,
-      });
+  try {
+    if (Array.isArray(body.sectionUpdates)) {
+      for (const update of body.sectionUpdates) {
+        if (!update?.key) continue;
+        if (!update.status) continue;
+        config = await patchSectionControl(update.key, {
+          status: update.status,
+          maintenanceMessage: typeof update.maintenanceMessage === 'string' ? update.maintenanceMessage : undefined,
+        });
+      }
     }
-  }
 
-  if (body.rateLimit && typeof body.rateLimit === 'object') {
-    config = await patchRateLimitConfig(body.rateLimit);
+    if (body.rateLimit && typeof body.rateLimit === 'object') {
+      config = await patchRateLimitConfig(body.rateLimit);
+    }
+
+    if (typeof body.feedLocked === 'boolean') {
+      config = await patchFeedLock(body.feedLocked);
+    }
+
+    if (typeof body.messagingLocked === 'boolean') {
+      config = await patchMessagingLock(body.messagingLocked);
+    }
+  } catch (err) {
+    console.error('[control-center PATCH] config update error:', err);
+    return NextResponse.json({ error: 'Erreur lors de la mise a jour de la configuration' }, { status: 500 });
   }
 
   await logAdminAction(
@@ -112,6 +134,12 @@ export async function PATCH(request: NextRequest) {
     `sections=${Array.isArray(body.sectionUpdates) ? body.sectionUpdates.length : 0} rl=${Boolean(body.rateLimit)}`,
   );
 
-  const analytics = await loadAnalytics();
+  let analytics = null;
+  try {
+    analytics = await loadAnalytics();
+  } catch {
+    // Analytics failure must not block the config update response.
+  }
+
   return NextResponse.json({ config, analytics, ok: true });
 }

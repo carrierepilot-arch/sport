@@ -22,6 +22,7 @@ type FeedPost = {
   id: string;
   content: string;
   createdAt: string;
+  pinned?: boolean;
   author: {
     id: string;
     pseudo: string;
@@ -80,7 +81,7 @@ type CommunityPerformance = {
     profileImageUrl?: string | null;
     verified: boolean;
   };
-  spot: { id: string; name: string; city: string | null };
+  spot: { id: string; name: string; city: string | null } | null;
 };
 
 type Conversation = { friendId: string; pseudo: string; nom: string; dernier: string; heure: string; nonLu: number; profileImageUrl?: string | null };
@@ -151,64 +152,6 @@ function isZipVideoUrl(url: string | null | undefined): boolean {
   return !!url && /\.zip($|\?)/i.test(url);
 }
 
-async function compressPerfVideo(file: File, onProgress: (pct: number) => void): Promise<File> {
-  if (typeof MediaRecorder === 'undefined' || typeof HTMLVideoElement === 'undefined') return file;
-  const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')
-    ? 'video/webm;codecs=vp8,opus'
-    : MediaRecorder.isTypeSupported('video/webm')
-      ? 'video/webm'
-      : null;
-  if (!mimeType) return file;
-  return new Promise((resolve) => {
-    const video = document.createElement('video');
-    video.muted = true;
-    video.playsInline = true;
-    video.style.display = 'none';
-    document.body.appendChild(video);
-    const objectUrl = URL.createObjectURL(file);
-    video.src = objectUrl;
-    video.onloadedmetadata = () => {
-      const MAX_H = 480;
-      const scale = video.videoHeight > MAX_H ? MAX_H / video.videoHeight : 1;
-      const w = Math.round(video.videoWidth * scale);
-      const h = Math.round(video.videoHeight * scale);
-      const canvas = document.createElement('canvas');
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext('2d')!;
-      const stream = canvas.captureStream(24);
-      const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 800_000 });
-      const chunks: Blob[] = [];
-      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
-      const duration = video.duration || 0;
-      recorder.onstop = () => {
-        URL.revokeObjectURL(objectUrl);
-        document.body.removeChild(video);
-        const blob = new Blob(chunks, { type: mimeType.split(';')[0] });
-        const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
-        resolve(new File([blob], file.name.replace(/\.[^.]+$/, `.${ext}`), { type: mimeType.split(';')[0] }));
-      };
-      const drawFrame = () => {
-        if (video.paused || video.ended) { recorder.stop(); return; }
-        ctx.drawImage(video, 0, 0, w, h);
-        if (duration > 0) onProgress(Math.round((video.currentTime / duration) * 90));
-        requestAnimationFrame(drawFrame);
-      };
-      recorder.start();
-      video.play().then(() => requestAnimationFrame(drawFrame)).catch(() => {
-        recorder.stop();
-        URL.revokeObjectURL(objectUrl);
-        document.body.removeChild(video);
-        resolve(file);
-      });
-    };
-    video.onerror = () => {
-      URL.revokeObjectURL(objectUrl);
-      document.body.removeChild(video);
-      resolve(file);
-    };
-  });
-}
 
 async function zipVideoFile(file: File, onProgress: (pct: number) => void): Promise<File> {
   const JSZip = (await import('jszip')).default;
@@ -323,7 +266,77 @@ async function compressFeedVideo(file: File, onProgress: (pct: number) => void):
   });
 }
 
-function parseFeedContent(content: string): { kind: 'text' | 'image' | 'video'; mediaUrl: string | null; text: string } {
+// ── Workout share card component ─────────────────────────────────────────────
+function WorkoutShareCard({ workoutData, isMine }: { workoutData: { title: string; programme: { jours?: { jour: string; focus: string; exercices: { nom: string; series: number; reps: string; repos: string }[] }[] } }; isMine: boolean }) {
+  const [showDetail, setShowDetail] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const jours = workoutData.programme?.jours ?? [];
+  return (
+    <div className={`rounded-2xl overflow-hidden border ${isMine ? 'border-sky-300 bg-sky-50' : 'border-emerald-200 bg-emerald-50'}`}>
+      <div className={`px-4 py-3 ${isMine ? 'bg-sky-600' : 'bg-emerald-600'}`}>
+        <p className="text-xs text-white/70 uppercase tracking-widest font-semibold">Programme partage</p>
+        <p className="text-sm font-bold text-white mt-0.5">{workoutData.title || 'Programme'}</p>
+      </div>
+      <div className="px-4 py-3">
+        <p className="text-xs text-gray-600">{jours.length} jour{jours.length > 1 ? 's' : ''} · {jours.reduce((s, j) => s + (j.exercices?.length ?? 0), 0)} exercices</p>
+        {!showDetail && jours.length > 0 && (
+          <button onClick={() => setShowDetail(true)} className="mt-2 text-xs font-semibold text-emerald-600 hover:text-emerald-500 transition">
+            Afficher plus
+          </button>
+        )}
+        {showDetail && (
+          <div className="mt-3 space-y-2">
+            {jours.map((jour, ji) => (
+              <div key={ji} className="bg-white rounded-lg border border-gray-200 p-3">
+                <p className="text-xs font-bold text-gray-800">{jour.jour} — {jour.focus}</p>
+                <div className="mt-1.5 space-y-1">
+                  {(jour.exercices ?? []).map((ex, ei) => (
+                    <p key={ei} className="text-xs text-gray-600">
+                      {ex.nom} — {ex.series}x{ex.reps} · repos {ex.repos}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            ))}
+            <button onClick={() => setShowDetail(false)} className="text-xs text-gray-400 hover:text-gray-600 transition">
+              Masquer
+            </button>
+          </div>
+        )}
+        {!saved ? (
+          <button
+            onClick={() => {
+              const token = localStorage.getItem('token');
+              if (!token || !workoutData.programme) return;
+              fetch('/api/workouts/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ title: workoutData.title || 'Programme recu', rawText: JSON.stringify(workoutData.programme), programme: workoutData.programme, sharedBy: isMine ? undefined : 'ami' }),
+              }).then(r => { if (r.ok) setSaved(true); }).catch(() => {});
+            }}
+            className={`mt-2 w-full py-2 rounded-lg text-xs font-bold transition ${isMine ? 'bg-sky-600 hover:bg-sky-500 text-white' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}
+          >
+            Valider et sauvegarder
+          </button>
+        ) : (
+          <p className="mt-2 text-xs text-emerald-600 font-semibold text-center py-2">Programme sauvegarde</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+type PollData = { question: string; options: string[]; votes: Record<string, number[]> };
+
+function parseFeedContent(content: string): { kind: 'text' | 'image' | 'video' | 'poll'; mediaUrl: string | null; text: string; pollData?: PollData } {
+  if (content.startsWith('__POLL__')) {
+    try {
+      const pollData = JSON.parse(content.slice(8)) as PollData;
+      return { kind: 'poll', mediaUrl: null, text: pollData.question, pollData };
+    } catch {
+      return { kind: 'text', mediaUrl: null, text: content };
+    }
+  }
   if (content.startsWith('__IMAGE__') || content.startsWith('__VIDEO__')) {
     const separatorIndex = content.indexOf('\n');
     const markerLength = content.startsWith('__IMAGE__') ? 9 : 9;
@@ -336,6 +349,19 @@ function parseFeedContent(content: string): { kind: 'text' | 'image' | 'video'; 
     };
   }
   return { kind: 'text', mediaUrl: null, text: content };
+}
+
+function parseChatContent(content: string): { kind: 'text' | 'image' | 'video' | 'workout_share'; mediaUrl: string | null; text: string; workoutData?: { title: string; programme: { jours?: { jour: string; focus: string; exercices: { nom: string; series: number; reps: string; repos: string }[] }[] } } } {
+  if (content.startsWith('__WORKOUT_SHARE__')) {
+    try {
+      const jsonStr = content.slice('__WORKOUT_SHARE__'.length);
+      const data = JSON.parse(jsonStr);
+      return { kind: 'workout_share', mediaUrl: null, text: '', workoutData: data };
+    } catch {
+      return { kind: 'text', mediaUrl: null, text: content };
+    }
+  }
+  return parseFeedContent(content) as { kind: 'text' | 'image' | 'video' | 'workout_share'; mediaUrl: string | null; text: string };
 }
 
 // ── Zip-aware video player ───────────────────────────────────────────────────
@@ -395,6 +421,13 @@ export default function SocialPage() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [uploadingVideo, setUploadingVideo] = useState(false);
   const [videoProgress, setVideoProgress] = useState<number | null>(null);
+
+  // Poll state
+  const [pollMode, setPollMode] = useState(false);
+  const [pollQuestion, setPollQuestion] = useState('');
+  const [pollOptions, setPollOptions] = useState<string[]>(['', '']);
+  const [pollPublishing, setPollPublishing] = useState(false);
+  const [pollVotingId, setPollVotingId] = useState<string | null>(null);
 
   // Boîte state
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -833,6 +866,48 @@ export default function SocialPage() {
     setPosting(false);
   };
 
+  const publishPoll = async () => {
+    const cleanOptions = pollOptions.map(o => o.trim()).filter(Boolean);
+    if (!pollQuestion.trim() || cleanOptions.length < 2) return;
+    setPollPublishing(true);
+    setComposerError('');
+    try {
+      const res = await fetch('/api/feed/poll', {
+        method: 'POST',
+        headers: authHeader(),
+        body: JSON.stringify({ question: pollQuestion.trim(), options: cleanOptions }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data?.post) {
+        setPosts((prev) => [data.post as FeedPost, ...prev]);
+        setPollMode(false);
+        setPollQuestion('');
+        setPollOptions(['', '']);
+        await loadFeed();
+      } else {
+        setComposerError(typeof data?.error === 'string' ? data.error : 'Erreur lors de la creation du sondage.');
+      }
+    } catch {
+      setComposerError('Erreur reseau.');
+    }
+    setPollPublishing(false);
+  };
+
+  const votePoll = async (postId: string, optionIndex: number) => {
+    setPollVotingId(postId);
+    try {
+      const res = await fetch('/api/feed/poll/vote', {
+        method: 'POST',
+        headers: authHeader(),
+        body: JSON.stringify({ postId, optionIndex }),
+      });
+      if (res.ok) {
+        await loadFeed();
+      }
+    } catch { /* silent */ }
+    setPollVotingId(null);
+  };
+
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -1046,15 +1121,16 @@ export default function SocialPage() {
       }
       const performanceId = (data.performance as { id?: string } | undefined)?.id;
 
-      // 2. If video selected: compress 480p → zip → upload
+      // 2. If video selected: zip → upload directly (no client-side compression which is unreliable)
       if (perfModalVideoFile && performanceId) {
         setPerfModalVideoProgress(0);
         try {
-          const compressed = await compressPerfVideo(perfModalVideoFile, (pct) =>
-            setPerfModalVideoProgress(Math.round(pct * 0.9)),
-          );
-          const zipped = await zipVideoFile(compressed, (pct) => setPerfModalVideoProgress(pct));
           const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+          setPerfModalVideoProgress(10);
+          const zipped = await zipVideoFile(perfModalVideoFile, (pct) =>
+            setPerfModalVideoProgress(10 + Math.round(pct * 0.4)),
+          );
+          setPerfModalVideoProgress(50);
           const { upload } = await import('@vercel/blob/client');
           const blob = await upload(
             `performances/${performanceId}/${Date.now()}-${zipped.name}`,
@@ -1064,10 +1140,13 @@ export default function SocialPage() {
               handleUploadUrl: '/api/performances/upload-video/client',
               clientPayload: performanceId,
               headers: token ? { Authorization: `Bearer ${token}` } : {},
+              onUploadProgress: ({ percentage }) => {
+                setPerfModalVideoProgress(50 + Math.round((percentage ?? 0) * 0.5));
+              },
             },
           );
+          setPerfModalVideoProgress(100);
           // Explicitly persist the video URL in the DB from the client side
-          // (does not rely solely on the onUploadCompleted webhook which can be unreliable)
           try {
             await fetch('/api/performances/upload-video', {
               method: 'PATCH',
@@ -1077,8 +1156,10 @@ export default function SocialPage() {
           } catch {
             // PATCH failed — onUploadCompleted webhook is the fallback
           }
-        } catch {
-          // Video upload failed but performance record is saved — continue silently
+        } catch (err) {
+          // Show error to user instead of silently ignoring
+          const msg = err instanceof Error ? err.message : '';
+          setPerfModalError(msg ? `Erreur vidéo : ${msg}` : 'Erreur lors de l\'upload vidéo. La performance a été enregistrée sans vidéo.');
         }
         setPerfModalVideoProgress(null);
       }
@@ -1244,7 +1325,67 @@ export default function SocialPage() {
 
               {/* Composer */}
               <div className="rounded-3xl border border-gray-200 bg-white p-5 sm:p-6 shadow-sm">
-                <h2 className="text-lg font-bold text-gray-900 mb-4">Quoi de neuf ?</h2>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-bold text-gray-900">{pollMode ? 'Creer un sondage' : 'Quoi de neuf ?'}</h2>
+                  <button
+                    onClick={() => { setPollMode(!pollMode); setComposerError(''); }}
+                    className={`text-xs font-bold px-3 py-1.5 rounded-lg transition ${pollMode ? 'bg-gray-200 text-gray-700' : 'bg-violet-100 text-violet-700 hover:bg-violet-200'}`}
+                  >
+                    {pollMode ? 'Annuler' : 'Sondage'}
+                  </button>
+                </div>
+
+                {pollMode ? (
+                  <div className="space-y-3">
+                    <input
+                      value={pollQuestion}
+                      onChange={(e) => setPollQuestion(e.target.value)}
+                      placeholder="Pose ta question..."
+                      className="w-full bg-gray-50 text-gray-900 placeholder:text-gray-400 outline-none text-sm p-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-violet-400 focus:border-transparent transition"
+                    />
+                    <div className="space-y-2">
+                      {pollOptions.map((opt, i) => (
+                        <div key={i} className="flex items-center gap-2">
+                          <input
+                            value={opt}
+                            onChange={(e) => {
+                              const copy = [...pollOptions];
+                              copy[i] = e.target.value;
+                              setPollOptions(copy);
+                            }}
+                            placeholder={`Option ${i + 1}`}
+                            className="flex-1 bg-gray-50 text-gray-900 placeholder:text-gray-400 outline-none text-sm p-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-violet-400 focus:border-transparent transition"
+                          />
+                          {pollOptions.length > 2 && (
+                            <button
+                              onClick={() => setPollOptions(pollOptions.filter((_, j) => j !== i))}
+                              className="w-7 h-7 rounded-full bg-red-100 text-red-600 text-xs font-bold flex items-center justify-center hover:bg-red-200 transition"
+                            >✕</button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    {pollOptions.length < 6 && (
+                      <button
+                        onClick={() => setPollOptions([...pollOptions, ''])}
+                        className="text-xs font-semibold text-violet-600 hover:text-violet-700 transition"
+                      >+ Ajouter une option</button>
+                    )}
+                    <div className="flex items-center justify-between gap-3 pt-2">
+                      <p className="text-xs text-gray-400">{pollOptions.filter(o => o.trim()).length} option{pollOptions.filter(o => o.trim()).length > 1 ? 's' : ''}</p>
+                      <button
+                        onClick={() => void publishPoll()}
+                        disabled={!pollQuestion.trim() || pollOptions.filter(o => o.trim()).length < 2 || pollPublishing}
+                        className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 text-white text-sm font-bold disabled:opacity-50 hover:shadow-lg transition-all"
+                      >
+                        {pollPublishing ? 'Publication...' : 'Publier le sondage'}
+                      </button>
+                    </div>
+                    {composerError && (
+                      <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">{composerError}</div>
+                    )}
+                  </div>
+                ) : (
                 <div className="space-y-3">
                   <div className="relative">
                     <textarea
@@ -1318,6 +1459,7 @@ export default function SocialPage() {
                     </div>
                   )}
                 </div>
+                )}
               </div>
 
               {/* Timeline */}
@@ -1342,7 +1484,12 @@ export default function SocialPage() {
                   posts.filter((post) => post && typeof post.id === 'string').map((post) => {
                     const canDelete = meId && post.author.id === meId;
                     return (
-                      <article key={post.id} className="rounded-2xl border border-gray-200 bg-white overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                      <article key={post.id} className={`rounded-2xl border bg-white overflow-hidden shadow-sm hover:shadow-md transition-shadow ${post.pinned ? 'border-amber-300' : 'border-gray-200'}`}>
+                        {post.pinned && (
+                          <div className="bg-amber-50 border-b border-amber-100 px-4 py-1.5 text-xs font-semibold text-amber-700">
+                            Message epingle
+                          </div>
+                        )}
                         <div className="p-4 sm:p-5">
                           <div className="flex items-start justify-between gap-3 mb-3">
                             <div className="flex items-center gap-3 flex-1">
@@ -1364,6 +1511,48 @@ export default function SocialPage() {
                           <div className="text-sm sm:text-base text-gray-800 leading-relaxed whitespace-pre-wrap mb-4">
                             {(() => {
                               const parsed = parseFeedContent(post.content);
+                              if (parsed.kind === 'poll' && parsed.pollData) {
+                                const pd = parsed.pollData;
+                                const allVotes = Object.values(pd.votes).flat();
+                                const totalVotes = allVotes.length;
+                                const myVotes = meId && pd.votes[meId] ? pd.votes[meId] : null;
+                                const hasVoted = myVotes !== null;
+                                const voteCounts = pd.options.map((_, oi) => allVotes.filter(v => v === oi).length);
+                                return (
+                                  <div className="space-y-3">
+                                    <p className="font-bold text-gray-900">{pd.question}</p>
+                                    <div className="space-y-2">
+                                      {pd.options.map((opt, oi) => {
+                                        const count = voteCounts[oi];
+                                        const pct = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0;
+                                        const isMyVote = hasVoted && myVotes?.includes(oi);
+                                        if (hasVoted) {
+                                          return (
+                                            <div key={oi} className="relative rounded-xl border border-gray-200 overflow-hidden">
+                                              <div className="absolute inset-0 bg-violet-100 transition-all" style={{ width: `${pct}%` }} />
+                                              <div className="relative flex items-center justify-between px-4 py-2.5">
+                                                <span className={`text-sm ${isMyVote ? 'font-bold text-violet-800' : 'text-gray-700'}`}>{opt}</span>
+                                                <span className="text-xs font-semibold text-gray-500">{pct}%</span>
+                                              </div>
+                                            </div>
+                                          );
+                                        }
+                                        return (
+                                          <button
+                                            key={oi}
+                                            onClick={() => void votePoll(post.id, oi)}
+                                            disabled={pollVotingId === post.id}
+                                            className="w-full text-left rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-700 hover:bg-violet-50 hover:border-violet-300 transition disabled:opacity-50"
+                                          >
+                                            {opt}
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                    <p className="text-xs text-gray-400">{totalVotes} vote{totalVotes !== 1 ? 's' : ''}</p>
+                                  </div>
+                                );
+                              }
                               if (parsed.kind === 'image' && parsed.mediaUrl) {
                                 return (
                                   <>
@@ -1598,9 +1787,37 @@ export default function SocialPage() {
                           ) : (
                             chat.map((m) => (
                               <div key={m.id} className={`max-w-[85%] ${m.from === 'me' ? 'ml-auto' : 'mr-auto'}`}>
-                                <div className={`rounded-2xl px-3 py-2 text-sm whitespace-pre-wrap break-words break-all ${m.from === 'me' ? 'bg-sky-600 text-white' : 'bg-gray-100 text-gray-900'}`}>
-                                  {m.text}
-                                </div>
+                                {(() => {
+                                  const parsed = parseChatContent(m.text);
+
+                                  // Workout share card
+                                  if (parsed.kind === 'workout_share' && parsed.workoutData) {
+                                    return (
+                                      <WorkoutShareCard workoutData={parsed.workoutData} isMine={m.from === 'me'} />
+                                    );
+                                  }
+
+                                  return (
+                                    <div className={`rounded-2xl px-3 py-2 text-sm whitespace-pre-wrap break-words break-all ${m.from === 'me' ? 'bg-sky-600 text-white' : 'bg-gray-100 text-gray-900'}`}>
+                                      {parsed.kind === 'image' && parsed.mediaUrl ? (
+                                        <img
+                                          src={parsed.mediaUrl}
+                                          alt="Image message"
+                                          className="mb-2 max-h-64 w-full rounded-xl object-cover"
+                                        />
+                                      ) : null}
+                                      {parsed.kind === 'video' && parsed.mediaUrl ? (
+                                        <video
+                                          controls
+                                          preload="metadata"
+                                          src={parsed.mediaUrl}
+                                          className="mb-2 max-h-64 w-full rounded-xl"
+                                        />
+                                      ) : null}
+                                      {parsed.text ? parsed.text : parsed.kind !== 'text' ? ' ' : m.text}
+                                    </div>
+                                  );
+                                })()}
                                 <p className="text-[11px] text-gray-400 mt-1 px-1">{m.heure}</p>
                               </div>
                             ))
@@ -1865,7 +2082,9 @@ export default function SocialPage() {
 
                         <div className="mt-3 flex items-center justify-between gap-3">
                           <p className="text-sm text-gray-700">{performance.exercise} · <span className="font-black text-gray-900">{performance.score} {performance.unit}</span></p>
-                          <p className="text-xs text-gray-500">{performance.spot.name}{performance.spot.city ? `, ${performance.spot.city}` : ''}</p>
+                          {performance.spot && (
+                            <p className="text-xs text-gray-500">{performance.spot.name}{performance.spot.city ? `, ${performance.spot.city}` : ''}</p>
+                          )}
                         </div>
 
                         {performance.videoUrl && (

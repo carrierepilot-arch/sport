@@ -13,10 +13,10 @@ type Lieu = 'Salle de sport' | 'Maison' | 'Street workout' | '';
 type Equipement = 'Ceinture lestee' | 'Gilet leste' | 'Elastiques' | 'Halteres' | 'Barre de traction' | 'Parallettes' | 'Anneaux' | 'Autre';
 interface EquipementConfig { maxKg: number; progression: string; detail?: string }
 
-type Figure = 'Front lever' | 'Back lever' | 'Handstand' | 'Drapeau' | 'Planche' | 'Muscle up statique';
+type Figure = 'Front lever' | 'Back lever' | 'Handstand' | 'Drapeau' | 'Planche' | 'Muscle up' | 'L-sit' | 'V-sit' | 'Dragon flag' | 'Pistol squat' | 'Handstand push-up' | '360 pull-up';
 type Muscle = 'Pectoraux' | 'Dos' | 'Epaules' | 'Biceps' | 'Triceps' | 'Abdominaux' | 'Jambes';
 
-const FIGURES: Figure[] = ['Front lever', 'Back lever', 'Handstand', 'Drapeau', 'Planche', 'Muscle up statique'];
+const FIGURES: Figure[] = ['Front lever', 'Back lever', 'Handstand', 'Drapeau', 'Planche', 'Muscle up', 'L-sit', 'V-sit', 'Dragon flag', 'Pistol squat', 'Handstand push-up', '360 pull-up'];
 
 const NIVEAUX: Record<Figure, string[]> = {
  'Front lever': ['Tuck front lever', 'Advanced tuck', 'Straddle', 'Front lever partiel', 'Front lever tenu 10s+'],
@@ -24,7 +24,13 @@ const NIVEAUX: Record<Figure, string[]> = {
  'Handstand': ['Contre le mur', 'Decolle du mur 5s', 'Tenu libre 10s', 'Tenu libre 30s', 'Handstand maitrise'],
  'Drapeau': ['Tuck drapeau', 'Genoux plies', 'Straddle', 'Drapeau partiel', 'Drapeau tenu 10s+'],
  'Planche': ['Lean planche', 'Tuck planche', 'Advanced tuck', 'Straddle', 'Full planche'],
- 'Muscle up statique': ['Traction haute', 'Transition basse', 'Transition mi-hauteur', 'Muscle up assiste', 'Muscle up strict'],
+ 'Muscle up': ['Traction haute', 'Transition basse', 'Transition mi-hauteur', 'Muscle up assiste', 'Muscle up strict'],
+ 'L-sit': ['L-sit au sol 5s', 'L-sit au sol 15s', 'L-sit aux barres 10s', 'L-sit aux barres 20s', 'L-sit tenu 30s+'],
+ 'V-sit': ['L-sit maitrise', 'V-sit assiste', 'V-sit partiel', 'V-sit 5s', 'V-sit tenu 10s+'],
+ 'Dragon flag': ['Tuck dragon flag', 'Un genou tendu', 'Straddle dragon flag', 'Dragon flag negatif', 'Dragon flag complet'],
+ 'Pistol squat': ['Squat bulgare', 'Pistol assiste (support)', 'Pistol negatif', 'Pistol partiel', 'Pistol squat complet'],
+ 'Handstand push-up': ['Pike push-up', 'Pike push-up sureleve', 'HSPU assiste mur', 'HSPU strict mur', 'HSPU libre'],
+ '360 pull-up': ['Traction explosive poitrine', 'Traction explosive lacher', 'Rotation 180', 'Rotation 270', '360 complet'],
 };
 
 const MUSCLES: Muscle[] = ['Pectoraux', 'Dos', 'Epaules', 'Biceps', 'Triceps', 'Abdominaux', 'Jambes'];
@@ -64,18 +70,20 @@ const TESTS_ENDURANCE: TestExercice[] = [
  { nom: 'Squats', duree: 60 },
 ];
 
-const TESTS_FORCE: TestExercice[] = [
- { nom: 'Pompes lestees max', duree: 60 },
- { nom: 'Tractions lestees max', duree: 60 },
- { nom: 'Dips lestes max', duree: 60 },
- { nom: 'Squat a une jambe', duree: 60 },
+const TESTS_FORCE_1RM = [
+ { nom: 'Tractions lestees', unite: 'kg' },
+ { nom: 'Dips lestes', unite: 'kg' },
+ { nom: 'Squats lestes', unite: 'kg' },
+ { nom: 'Pompes lestees', unite: 'kg' },
 ];
 
+type ForceRMType = '1RM' | '2RM' | '3RM';
+
 const TESTS_STATIQUE: TestExercice[] = [
- { nom: 'Front lever - maintien max', duree: 30 },
- { nom: 'Back lever - maintien max', duree: 30 },
- { nom: 'Handstand - maintien max', duree: 60 },
- { nom: 'Drapeau - maintien max', duree: 30 },
+ { nom: 'Traction - menton au-dessus de la barre', duree: 15 },
+ { nom: 'Dips - position haute (bras tendus)', duree: 15 },
+ { nom: 'Dips - position basse (fin du mouvement)', duree: 15 },
+ { nom: 'Pompes - position intermediaire (mi-descente)', duree: 15 },
 ];
 
 // ─── Components ───
@@ -187,24 +195,31 @@ function TestNiveau({ onComplete }: { onComplete?: () => void }) {
  const [manualForce, setManualForce] = useState<Record<string, string>>({});
  const [manualSaving, setManualSaving] = useState(false);
  const [manualSaved, setManualSaved] = useState(false);
+ // Force 1RM state
+ const [forceRMType, setForceRMType] = useState<ForceRMType>('1RM');
+ const [forceInputs, setForceInputs] = useState<Record<string, string>>({});
+ const [forceRepsInputs, setForceRepsInputs] = useState<Record<string, string>>({});
 
- const exercises = testType === 'endurance' ? TESTS_ENDURANCE : testType === 'force' ? TESTS_FORCE : TESTS_STATIQUE;
+ const exercises = testType === 'endurance' ? TESTS_ENDURANCE : testType === 'statique' ? TESTS_STATIQUE : TESTS_ENDURANCE;
 
  const startTest = (type: TestType) => {
  setTestType(type);
  setTestStarted(true);
  setCurrentExo(0);
- setPhase('exercice');
+ setPhase(type === 'force' ? 'termine' : 'exercice');
  setReps([]);
  setCurrentReps('');
  setReposDuree(240);
  setEvaluation(null);
+ setForceInputs({});
+ setForceRepsInputs({});
  };
 
  const onExerciceComplete = useCallback(() => {
  setPhase('saisie');
  }, []);
 
+ // Submit for endurance / static tests (timed)
  const submitReps = () => {
  const val = parseInt(currentReps) || 0;
  const newReps = [...reps, val];
@@ -215,7 +230,6 @@ function TestNiveau({ onComplete }: { onComplete?: () => void }) {
  setReposDuree(240);
  } else {
  setPhase('termine');
- // Appel API evaluation
  const nomExercices = exercises.map((e) => e.nom);
  setEvaluating(true);
  const token = localStorage.getItem('token');
@@ -229,6 +243,24 @@ function TestNiveau({ onComplete }: { onComplete?: () => void }) {
  .catch(() => setEvaluation('Erreur de connexion.'))
  .finally(() => setEvaluating(false));
  }
+ };
+
+ // Submit for force test (1RM/2RM/3RM weights)
+ const submitForceTest = () => {
+ const nomExercices = TESTS_FORCE_1RM.map((e) => e.nom);
+ const resultats = TESTS_FORCE_1RM.map((e) => parseFloat(forceInputs[e.nom] || '0'));
+ const repsPerExo = TESTS_FORCE_1RM.map((e) => parseInt(forceRepsInputs[e.nom] || (forceRMType === '1RM' ? '1' : forceRMType === '2RM' ? '2' : '3')));
+ setEvaluating(true);
+ const token = localStorage.getItem('token');
+ fetch('/api/evaluer-test', {
+ method: 'POST',
+ headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+ body: JSON.stringify({ testType: 'force', exercices: nomExercices, resultats, forceRMType, forceRepsPerExo: repsPerExo }),
+ })
+ .then((r) => r.json())
+ .then((d) => { setEvaluation(d.evaluation || d.error || null); onComplete?.(); })
+ .catch(() => setEvaluation('Erreur de connexion.'))
+ .finally(() => setEvaluating(false));
  };
 
  const onReposComplete = useCallback(() => {
@@ -275,6 +307,8 @@ function TestNiveau({ onComplete }: { onComplete?: () => void }) {
  manualForce: {
  pompes_lestees: manualForce['pompes_lestees'] || '0',
  tractions_lestees: manualForce['tractions_lestees'] || '0',
+ dips_lestes: manualForce['dips_lestes'] || '0',
+ squats_lestes: manualForce['squats_lestes'] || '0',
  },
  }),
  });
@@ -290,8 +324,8 @@ function TestNiveau({ onComplete }: { onComplete?: () => void }) {
  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
  {([
  { type: 'endurance' as TestType, label: 'Test Endurance', desc: '4 exercices, 1 min chacun' },
- { type: 'force' as TestType, label: 'Test Force', desc: '4 exercices lestes' },
- { type: 'statique' as TestType, label: 'Test Statique', desc: '4 figures, maintien max' },
+ { type: 'force' as TestType, label: 'Test Force', desc: '1RM / 2RM / 3RM (charges)' },
+ { type: 'statique' as TestType, label: 'Test Positionnel', desc: '4 positions, maintien max' },
  ]).map((t) => (
  <button
  key={t.type}
@@ -377,7 +411,12 @@ function TestNiveau({ onComplete }: { onComplete?: () => void }) {
  <div>
  <p className="text-sm font-medium text-gray-700 mb-2">Charge max lestée (optionnel, en kg)</p>
  <div className="grid grid-cols-2 gap-3">
- {[{ key: 'pompes_lestees', label: 'Pompes lestées' }, { key: 'tractions_lestees', label: 'Tractions lestées' }].map((f) => (
+ {[
+ { key: 'tractions_lestees', label: 'Tractions lestées' },
+ { key: 'dips_lestes', label: 'Dips lestés' },
+ { key: 'squats_lestes', label: 'Squats lestés' },
+ { key: 'pompes_lestees', label: 'Pompes lestées' },
+ ].map((f) => (
  <div key={f.key}>
  <label className="text-xs text-gray-500 font-medium mb-1 block">{f.label}</label>
  <input type="number" min={0} placeholder="0 kg"
@@ -399,9 +438,88 @@ function TestNiveau({ onComplete }: { onComplete?: () => void }) {
  }
 
  if (phase === 'termine') {
+ // ── Force test: 1RM / 2RM / 3RM input form ──
+ if (testType === 'force' && !evaluation) {
+ return (
+ <div className="space-y-5">
+ <div className="flex items-center justify-between">
+ <h3 className="text-lg font-bold text-gray-900">Test de Force (RM)</h3>
+ <button onClick={resetTest} className="text-sm text-gray-400 hover:text-gray-600 transition">Annuler</button>
+ </div>
+
+ <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+ <p className="text-sm text-amber-800 font-medium">Renseignez la charge maximale que vous pouvez soulever pour 1, 2 ou 3 repetitions sur chaque exercice.</p>
+ </div>
+
+ {/* RM type selector */}
+ <div>
+ <p className="text-sm font-medium text-gray-700 mb-2">Type de mesure</p>
+ <div className="grid grid-cols-3 gap-2">
+ {(['1RM', '2RM', '3RM'] as ForceRMType[]).map((rm) => (
+ <button key={rm} onClick={() => setForceRMType(rm)}
+ className={`py-3 rounded-xl border-2 text-sm font-semibold transition text-center ${
+ forceRMType === rm ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-gray-200 text-gray-600 hover:border-emerald-400 bg-white'
+ }`}>
+ <span className="block font-bold">{rm}</span>
+ <span className="block text-xs mt-0.5 opacity-75">{rm === '1RM' ? '1 rep max' : rm === '2RM' ? '2 reps max' : '3 reps max'}</span>
+ </button>
+ ))}
+ </div>
+ </div>
+
+ {/* Weight inputs per exercise */}
+ <div className="space-y-3">
+ <p className="text-sm font-medium text-gray-700">Charges par exercice ({forceRMType})</p>
+ {TESTS_FORCE_1RM.map((exo) => (
+ <div key={exo.nom} className="bg-white border border-gray-200 rounded-xl p-4">
+ <label className="text-sm font-semibold text-gray-800 block mb-2">{exo.nom}</label>
+ <div className="flex items-center gap-3">
+ <div className="flex-1">
+ <input type="number" min={0} step={0.5} placeholder="0"
+ value={forceInputs[exo.nom] ?? ''}
+ onChange={(e) => setForceInputs((p) => ({ ...p, [exo.nom]: e.target.value }))}
+ className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm text-gray-900 focus:ring-2 focus:ring-emerald-500 outline-none text-center text-lg font-bold" />
+ <span className="text-xs text-gray-400 mt-1 block text-center">kg</span>
+ </div>
+ {forceRMType !== '1RM' && (
+ <div className="w-20">
+ <input type="number" min={1} max={forceRMType === '2RM' ? 2 : 3} placeholder={forceRMType === '2RM' ? '2' : '3'}
+ value={forceRepsInputs[exo.nom] ?? ''}
+ onChange={(e) => setForceRepsInputs((p) => ({ ...p, [exo.nom]: e.target.value }))}
+ className="w-full px-2 py-2.5 rounded-lg border border-gray-200 text-sm text-gray-900 focus:ring-2 focus:ring-emerald-500 outline-none text-center" />
+ <span className="text-xs text-gray-400 mt-1 block text-center">reps</span>
+ </div>
+ )}
+ </div>
+ </div>
+ ))}
+ </div>
+
+ <button onClick={submitForceTest} disabled={evaluating || TESTS_FORCE_1RM.every((e) => !forceInputs[e.nom])}
+ className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 disabled:bg-gray-300 disabled:text-gray-500 text-white font-semibold rounded-lg transition">
+ {evaluating ? 'Analyse en cours...' : 'Evaluer mon niveau de force'}
+ </button>
+ </div>
+ );
+ }
+
+ // ── Results display for all test types (after evaluation) ──
  return (
  <div className="space-y-4">
  <h3 className="text-lg font-bold text-gray-900">Resultats du test</h3>
+
+ {testType === 'force' ? (
+ <div className="grid grid-cols-2 gap-3">
+ {TESTS_FORCE_1RM.map((exo) => (
+ <div key={exo.nom} className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+ <p className="text-sm font-medium text-gray-700">{exo.nom}</p>
+ <p className="text-2xl font-bold text-emerald-600 tabular-nums">{forceInputs[exo.nom] || 0} kg</p>
+ <p className="text-xs text-gray-400">{forceRMType}</p>
+ </div>
+ ))}
+ </div>
+ ) : (
+ <>
  <div className="grid grid-cols-2 gap-3">
  {exercises.map((ex, i) => (
  <div key={ex.nom} className="bg-gray-50 border border-gray-200 rounded-xl p-4">
@@ -415,6 +533,8 @@ function TestNiveau({ onComplete }: { onComplete?: () => void }) {
  Total : {reps.reduce((a, b) => a + b, 0)} {testType === 'statique' ? 'secondes' : 'repetitions'}
  </p>
  </div>
+ </>
+ )}
 
  {/* Evaluation IA */}
  <div className="bg-white border border-gray-200 rounded-xl p-5">
@@ -997,6 +1117,201 @@ const TUTOS = [
  { titre: 'Erreurs fréquentes', contenu: 'Hanches qui tombent du mauvais côté, bras qui plient, épaules qui remontent.' },
  ],
  },
+ {
+ id: 'planche',
+ title: 'Planche',
+ level: 'Expert',
+ levelColor: 'bg-purple-100 text-purple-700',
+ description: 'Position isométrique où le corps est maintenu horizontal face au sol, bras tendus, sans appui sur les jambes.',
+ muscles: ['Épaules', 'Pectoraux', 'Abdominaux', 'Dorsaux', 'Triceps'],
+ etapes: [
+ { titre: 'Prérequis', contenu: 'Maîtriser les pompes pseudo-planche (20 reps). Bonne mobilité des poignets. Épaules très stables.' },
+ { titre: 'Progressions', contenu: '1. Lean planche (inclinaison avant) → 2. Tuck planche (genoux repliés) → 3. Advanced tuck (genoux moins repliés) → 4. Straddle planche (jambes écartées) → 5. Full planche.' },
+ { titre: 'Technique', contenu: 'Mains au sol, doigts orientés vers l\'extérieur. Pousser fort dans le sol, protracter les scapulas. Corps parallèle au sol, hanches à la hauteur des épaules.' },
+ { titre: 'Durée & volume', contenu: '5×3-5 sec en tuck. Progresser de 1 sec par semaine. Travailler 3-4 fois par semaine.' },
+ { titre: 'Erreurs fréquentes', contenu: 'Hanches trop hautes ou trop basses, épaules insuffisamment protractées, poignets non conditionnés.' },
+ ],
+ },
+ {
+ id: 'back-lever',
+ title: 'Back Lever',
+ level: 'Intermédiaire',
+ levelColor: 'bg-orange-100 text-orange-700',
+ description: 'Position isométrique suspendue à la barre, corps horizontal face vers le sol, saisie en supination.',
+ muscles: ['Dorsaux', 'Biceps', 'Épaules', 'Abdominaux', 'Pectoraux'],
+ etapes: [
+ { titre: 'Prérequis', contenu: 'Maîtriser le skin the cat. 10+ tractions strictes. Bonne mobilité d\'épaule en extension.' },
+ { titre: 'Progressions', contenu: '1. German hang (position basse) → 2. Tuck back lever → 3. Advanced tuck → 4. Straddle → 5. Back lever complet.' },
+ { titre: 'Technique', contenu: 'Saisir la barre en supination. Passer en position inversée puis descendre lentement. Contracter les dorsaux, rentrer le menton. Corps rigide et aligné.' },
+ { titre: 'Durée & volume', contenu: '3×5 sec en tuck. Progresser à 3×10 sec. Ajouter 2 sec par semaine.' },
+ { titre: 'Erreurs fréquentes', contenu: 'Épaules trop tendues, manque de contrôle à la descente, dos cambré.' },
+ ],
+ },
+ {
+ id: 'handstand',
+ title: 'Handstand',
+ level: 'Intermédiaire',
+ levelColor: 'bg-orange-100 text-orange-700',
+ description: 'Équilibre sur les mains, corps vertical et aligné. Base fondamentale du calisthenics avancé.',
+ muscles: ['Épaules', 'Triceps', 'Abdominaux', 'Trapèzes', 'Poignets'],
+ etapes: [
+ { titre: 'Prérequis', contenu: 'Tenir le handstand mur 45+ sec. Bonne mobilité d\'épaule (180°). Poignets conditionnés.' },
+ { titre: 'Progressions', contenu: '1. Handstand mur ventre face au mur → 2. Décollements 1-2 sec → 3. Kick-up libre 5 sec → 4. Tenu libre 15-30 sec → 5. Handstand walk / presses.' },
+ { titre: 'Technique', contenu: 'Mains largeur d\'épaules, doigts écartés. Corps droit (épaules ouvertes, côtes rentrées, fessiers serrés). Regard entre les mains. Corrections par les doigts.' },
+ { titre: 'Durée & volume', contenu: 'Pratiquer 15-20 min par jour. Viser de nombreux essais courts. Progresser en durée et en contrôle.' },
+ { titre: 'Erreurs fréquentes', contenu: 'Dos cambré (banana handstand), épaules fermées, regard trop en avant, corrections tardives.' },
+ ],
+ },
+ {
+ id: 'handstand-push-up',
+ title: 'Handstand Push-Up',
+ level: 'Avancé',
+ levelColor: 'bg-red-100 text-red-700',
+ description: 'Pompe en position inversée (handstand). Développé militaire au poids du corps ultime.',
+ muscles: ['Épaules', 'Triceps', 'Trapèzes', 'Abdominaux'],
+ etapes: [
+ { titre: 'Prérequis', contenu: 'Handstand mur stable 30+ sec. Pike push-ups surélevés 10+ reps. Bonne force de poussée verticale.' },
+ { titre: 'Progressions', contenu: '1. Pike push-ups au sol → 2. Pike push-ups pieds surélevés → 3. HSPU assisté au mur (amplitude partielle) → 4. HSPU strict au mur (amplitude complète) → 5. HSPU libre.' },
+ { titre: 'Technique', contenu: 'Face au mur, mains légèrement plus larges que les épaules. Descendre en contrôle, tête au sol. Pousser de manière explosive. Gainage serré tout le long.' },
+ { titre: 'Durée & volume', contenu: 'Commencer par 5×3 en amplitude partielle mur. Progresser vers amplitude complète. Viser 5×5 strict au mur avant de passer au libre.' },
+ { titre: 'Erreurs fréquentes', contenu: 'Amplitude insuffisante, dos cambré, coudes qui partent vers l\'extérieur, manque de gainage.' },
+ ],
+ },
+ {
+ id: 'l-sit',
+ title: 'L-Sit',
+ level: 'Intermédiaire',
+ levelColor: 'bg-orange-100 text-orange-700',
+ description: 'Position isométrique où le corps forme un L, bras tendus, jambes parallèles au sol.',
+ muscles: ['Abdominaux', 'Fléchisseurs de hanche', 'Triceps', 'Épaules', 'Quadriceps'],
+ etapes: [
+ { titre: 'Prérequis', contenu: 'Planche au sol 60 sec. Leg raises suspendus 10+ reps. Bonne compression de hanche.' },
+ { titre: 'Progressions', contenu: '1. L-sit un genou replié → 2. L-sit au sol genoux pliés → 3. L-sit au sol jambes tendues → 4. L-sit aux barres parallèles → 5. L-sit suspendu à la barre.' },
+ { titre: 'Technique', contenu: 'Bras verrouillés, épaules basses et protractées. Jambes tendues, orteils pointés. Contracter les abdos et les fléchisseurs de hanche en permanence.' },
+ { titre: 'Durée & volume', contenu: '5×5 sec au début. Progresser à 3×15-20 sec. Pratiquer 3-4 fois par semaine.' },
+ { titre: 'Erreurs fréquentes', contenu: 'Épaules qui remontent vers les oreilles, jambes qui tombent, dos arrondi.' },
+ ],
+ },
+ {
+ id: 'v-sit',
+ title: 'V-Sit',
+ level: 'Expert',
+ levelColor: 'bg-purple-100 text-purple-700',
+ description: 'Version avancée du L-sit où les jambes sont levées au-dessus de la ligne des épaules, formant un V.',
+ muscles: ['Abdominaux', 'Fléchisseurs de hanche', 'Épaules', 'Triceps'],
+ etapes: [
+ { titre: 'Prérequis', contenu: 'L-sit tenu 15+ sec. Excellente compression de hanche. Souplesse ischio-jambiers avancée.' },
+ { titre: 'Progressions', contenu: '1. L-sit maîtrisé → 2. Compression hold (genoux vers poitrine) → 3. V-sit partiel (jambes à 45°) → 4. V-sit pieds au niveau de la tête → 5. Manna (stade ultime).' },
+ { titre: 'Technique', contenu: 'Depuis le L-sit, lever les jambes en contractant les abdos et les fléchisseurs. Presser fort dans le sol, protracter au maximum les épaules. Garder les jambes tendues.' },
+ { titre: 'Durée & volume', contenu: 'Commencer par 5×2-3 sec. Chaque semaine, viser +1 sec. Travailler la compression au quotidien.' },
+ { titre: 'Erreurs fréquentes', contenu: 'Jambes pliées, épaules qui montent, manque de compression, perte de gainage.' },
+ ],
+ },
+ {
+ id: 'dragon-flag',
+ title: 'Dragon Flag',
+ level: 'Avancé',
+ levelColor: 'bg-red-100 text-red-700',
+ description: 'Mouvement d\'abdominaux avancé popularisé par Bruce Lee. Corps rigide pivoté sur les épaules.',
+ muscles: ['Abdominaux', 'Obliques', 'Dorsaux', 'Fléchisseurs de hanche'],
+ etapes: [
+ { titre: 'Prérequis', contenu: 'Leg raises suspendus 15+ reps. Planche au sol 90+ sec. Bonne force de gainage global.' },
+ { titre: 'Progressions', contenu: '1. Tuck dragon flag (genoux repliés) → 2. Un genou tendu → 3. Straddle dragon flag → 4. Dragon flag négatif (descente lente) → 5. Dragon flag complet (montée + descente).' },
+ { titre: 'Technique', contenu: 'Allongé sur un banc, saisir l\'arrière au-dessus de la tête. Monter le corps en pivot sur les épaules (pas sur la nuque). Descendre en contrôle, corps rigide comme une planche.' },
+ { titre: 'Durée & volume', contenu: '3-4 x 3-5 reps en négatif. Progresser vers la version complète. 2-3 séances par semaine.' },
+ { titre: 'Erreurs fréquentes', contenu: 'Pivoter sur la nuque au lieu des épaules, hanches qui plient, descente trop rapide.' },
+ ],
+ },
+ {
+ id: 'pistol-squat',
+ title: 'Pistol Squat',
+ level: 'Intermédiaire',
+ levelColor: 'bg-orange-100 text-orange-700',
+ description: 'Squat unipodal complet, jambe libre tendue devant. Test ultime de force et mobilité des jambes.',
+ muscles: ['Quadriceps', 'Fessiers', 'Ischio-jambiers', 'Mollets', 'Abdominaux'],
+ etapes: [
+ { titre: 'Prérequis', contenu: 'Squat complet (full range) 20+ reps. Bonne mobilité de cheville. Équilibre unipodal stable.' },
+ { titre: 'Progressions', contenu: '1. Squat bulgare profond → 2. Pistol squat assisté (avec support) → 3. Pistol négatif (descente lente) → 4. Pistol partiel (sur box) → 5. Pistol squat complet.' },
+ { titre: 'Technique', contenu: 'Debout sur un pied, l\'autre jambe tendue devant. Descendre en contrôle en gardant le talon au sol. Dos droit, genou dans l\'axe du pied. Remonter en poussant fort dans le sol.' },
+ { titre: 'Durée & volume', contenu: '3×3-5 reps par jambe. Alterner les jambes. Progresser vers 3×8 reps. 2-3 sessions par semaine.' },
+ { titre: 'Erreurs fréquentes', contenu: 'Talon qui décolle, genou en valgus, perte d\'équilibre, manque de profondeur.' },
+ ],
+ },
+ {
+ id: 'pull-ups-avances',
+ title: 'Tractions avancées',
+ level: 'Intermédiaire',
+ levelColor: 'bg-orange-100 text-orange-700',
+ description: 'Toutes les variantes de tractions au-delà de la traction classique : archer, typewriter, one arm.',
+ muscles: ['Dorsaux', 'Biceps', 'Avant-bras', 'Épaules', 'Abdominaux'],
+ etapes: [
+ { titre: 'Prérequis', contenu: '15+ tractions strictes. Bonne force de grip. Stabilité scapulaire solide.' },
+ { titre: 'Progressions', contenu: '1. Traction large (wide grip) → 2. Traction commando (alternée) → 3. Archer pull-up → 4. Typewriter pull-up → 5. One-arm chin-up (assisté puis strict).' },
+ { titre: 'Technique', contenu: 'Archer : un bras tire, l\'autre guide le long de la barre. Typewriter : au sommet, déplacer latéralement. One-arm : saisie à un bras, l\'autre main sur le poignet puis sans aide.' },
+ { titre: 'Durée & volume', contenu: 'Archer : 3×5 par côté. Typewriter : 3×3. One-arm négatif : 5×1 par bras.' },
+ { titre: 'Erreurs fréquentes', contenu: 'Balancement excessif, amplitude incomplète, bras guide qui travaille trop.' },
+ ],
+ },
+ {
+ id: 'explosive-pull-ups',
+ title: 'Tractions explosives',
+ level: 'Avancé',
+ levelColor: 'bg-red-100 text-red-700',
+ description: 'Tractions avec phase de vol : clap, lâcher de barre, 360. Développe la puissance maximale.',
+ muscles: ['Dorsaux', 'Biceps', 'Épaules', 'Avant-bras', 'Abdominaux'],
+ etapes: [
+ { titre: 'Prérequis', contenu: '15+ tractions strictes rapides. Tractions poitrine à la barre. Bonne coordination et explosivité.' },
+ { titre: 'Progressions', contenu: '1. Traction explosive (poitrine à la barre) → 2. Traction clap → 3. Traction lâcher complet → 4. Traction 180° → 5. Traction 360°.' },
+ { titre: 'Technique', contenu: 'Phase de tirage maximale et explosive. Lâcher la barre au sommet. Effectuer le geste aérien. Rattraper la barre avec contrôle. Toujours commencer avec un tapis de sécurité en dessous.' },
+ { titre: 'Durée & volume', contenu: 'Commencer par 5×1 rep. Chaque variante doit être maîtrisée avant de passer à la suivante. 2-3 séances par semaine.' },
+ { titre: 'Erreurs fréquentes', contenu: 'Manque de hauteur, mauvais timing de lâcher, rattrapage mal contrôlé, entraînement sans sécurité.' },
+ ],
+ },
+ {
+ id: 'archer-push-ups',
+ title: 'Pompes avancées',
+ level: 'Intermédiaire',
+ levelColor: 'bg-orange-100 text-orange-700',
+ description: 'Du pseudo-planche push-up aux pompes une main. Variantes de poussée pour progresser vers la planche.',
+ muscles: ['Pectoraux', 'Triceps', 'Épaules', 'Abdominaux'],
+ etapes: [
+ { titre: 'Prérequis', contenu: '30+ pompes strictes. Bonne force de poussée. Poignets conditionnés.' },
+ { titre: 'Progressions', contenu: '1. Pompes diamant → 2. Archer push-up → 3. Pompes pseudo-planche (mains reculeés) → 4. Pompe une main assistée → 5. Pompe une main stricte.' },
+ { titre: 'Technique', contenu: 'Archer : un bras pousse, l\'autre est tendu sur le côté. Pseudo-planche : mains au niveau des hanches, incliner vers l\'avant. One-arm : pieds écartés pour l\'équilibre, corps rigide.' },
+ { titre: 'Durée & volume', contenu: 'Archer : 3×8 par côté. Pseudo-planche : 3×8. One-arm : 3×3 par bras. Progresser +1 rep par semaine.' },
+ { titre: 'Erreurs fréquentes', contenu: 'Hanches qui tournent sur les one-arm, amplitude insuffisante, coudes trop écartés.' },
+ ],
+ },
+ {
+ id: 'dips-avances',
+ title: 'Dips avancés',
+ level: 'Intermédiaire',
+ levelColor: 'bg-orange-100 text-orange-700',
+ description: 'Progressions de dips : lestés, aux anneaux, impossible dips, korean dips.',
+ muscles: ['Triceps', 'Pectoraux', 'Épaules', 'Abdominaux'],
+ etapes: [
+ { titre: 'Prérequis', contenu: '20+ dips strictes aux barres parallèles. Bonne stabilité des épaules.' },
+ { titre: 'Progressions', contenu: '1. Dips lestés → 2. Dips anneaux (instabilité) → 3. Korean dips (barre derrière) → 4. Impossible dips (barre devant, montée) → 5. Dips en L-sit.' },
+ { titre: 'Technique', contenu: 'Lestés : ceinture ou gilet, même technique que les dips classiques. Korean dips : barre derrière le dos, descente profonde. Anneaux : stabiliser avant de descendre.' },
+ { titre: 'Durée & volume', contenu: 'Lestés : 4×6-8 reps. Anneaux : 3×8. Korean : 3×5. Progresser en charge ou en reps par semaine.' },
+ { titre: 'Erreurs fréquentes', contenu: 'Trop de charge trop vite sur les lestés, instabilité aux anneaux, amplitude partielle.' },
+ ],
+ },
+ {
+ id: 'core-avance',
+ title: 'Core avancé',
+ level: 'Intermédiaire',
+ levelColor: 'bg-orange-100 text-orange-700',
+ description: 'Gainage et abdominaux avancés : windshield wipers, toes to bar, front lever raises.',
+ muscles: ['Abdominaux', 'Obliques', 'Fléchisseurs de hanche', 'Dorsaux'],
+ etapes: [
+ { titre: 'Prérequis', contenu: 'Leg raises suspendus 12+ reps. Planche 90+ sec. L-sit 10+ sec.' },
+ { titre: 'Progressions', contenu: '1. Toes to bar → 2. Windshield wipers (genoux) → 3. Windshield wipers (jambes tendues) → 4. Front lever raises → 5. Combo : L-sit to V-sit.' },
+ { titre: 'Technique', contenu: 'Toes to bar : jambes tendues, monter les pieds jusqu\'à la barre. Windshield wipers : en position de suspension, pivoter les jambes d\'un côté à l\'autre. Contrôle maximal.' },
+ { titre: 'Durée & volume', contenu: 'Toes to bar : 3×10. Windshield wipers : 3×5 par côté. Front lever raises : 3×5. 3 séances par semaine.' },
+ { titre: 'Erreurs fréquentes', contenu: 'Momentum au lieu du contrôle, balancement, amplitude réduite.' },
+ ],
+ },
 ];
 
 function TutoTab() {
@@ -1006,8 +1321,8 @@ function TutoTab() {
  return (
  <div className="space-y-5">
  <div className="rounded-2xl border border-gray-200 bg-white p-5 sm:p-6 shadow-sm">
- <h2 className="text-lg font-bold text-gray-900 mb-1">Tutoriels Street Workout</h2>
- <p className="text-sm text-gray-500">Apprenez les mouvements emblématiques du street workout, étape par étape.</p>
+ <h2 className="text-lg font-bold text-gray-900 mb-1">Skills Street Workout</h2>
+ <p className="text-sm text-gray-500">Maitrisez les mouvements emblematiques du calisthenics, etape par etape.</p>
  </div>
 
  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -1039,8 +1354,8 @@ function TutoTab() {
  </div>
 
  <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-5 text-center">
- <p className="text-sm font-semibold text-gray-600">D&apos;autres tutoriels arrivent prochainement</p>
- <p className="text-xs text-gray-400 mt-1">Planche, Back lever, 360°, Victorian...</p>
+ <p className="text-sm font-semibold text-gray-600">D&apos;autres skills arrivent regulierement</p>
+ <p className="text-xs text-gray-400 mt-1">Victorian, Maltese, Iron cross...</p>
  </div>
 
  {/* Modal tutoriel */}
@@ -1735,7 +2050,7 @@ export default function EntrainementPage() {
  {([
  { key: 'seances' as const, label: `Mes séances${savedWorkouts.length > 0 ? ` (${savedWorkouts.length})` : ''}` },
  { key: 'config' as const, label: 'Programmes sur mesure' },
- { key: 'tuto' as const, label: 'Tuto' },
+ { key: 'tuto' as const, label: 'Skills' },
  ]).map((t) => (
  <button key={t.key} onClick={() => setEntrainementTab(t.key)}
  className={`snap-start flex-shrink-0 px-4 py-2 sm:px-5 rounded-lg text-xs sm:text-sm font-medium transition ${entrainementTab === t.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
@@ -1920,9 +2235,9 @@ export default function EntrainementPage() {
  )}
  </Section>
 
- {/* ── 2. RASCUES (figures statiques) — masqué pour débutants ── */}
+ {/* ── 2. SKILLS (figures statiques) — masqué pour débutants ── */}
  {userLevel !== 'debutant' && (
- <Section title="Rascues">
+ <Section title="Skills">
  {figuresSelectees.length > 2 && (
  <div className="bg-amber-50 border border-amber-300 rounded-lg p-3 mb-4">
  <p className="text-sm font-medium text-amber-800">

@@ -54,5 +54,9 @@ export function decryptMessageContent(content: string | null | undefined): strin
 export function buildMessagePreview(content: string | null | undefined, maxLength = 50): string {
   const decrypted = decryptMessageContent(content).replace(/\s+/g, ' ').trim();
   if (!decrypted) return '';
+  // Handle special content markers
+  if (decrypted.startsWith('__WORKOUT_SHARE__')) return 'Programme d\'entrainement partage';
+  if (decrypted.startsWith('__IMAGE__')) return 'Image';
+  if (decrypted.startsWith('__VIDEO__')) return 'Video';
   return decrypted.length > maxLength ? `${decrypted.slice(0, maxLength)}...` : decrypted;
 }

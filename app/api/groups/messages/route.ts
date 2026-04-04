@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/auth';
 import { enforceRequestRateLimit } from '@/lib/request-rate-limit';
 import { decryptMessageContent, encryptMessageContent } from '@/lib/message-crypto';
+import { getAdminControlConfig } from '@/lib/admin-control-config';
 
 // GET — get messages for a group (must be a member)
 export async function GET(request: NextRequest) {
@@ -52,6 +53,18 @@ export async function POST(request: NextRequest) {
  if (!token) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
  const payload = verifyToken(token);
  if (!payload) return NextResponse.json({ error: 'Token invalide' }, { status: 401 });
+
+ // Check messaging lock — only adminLevel 3 can send when locked
+ const [adminConfig, sender] = await Promise.all([
+   getAdminControlConfig(),
+   prisma.user.findUnique({ where: { id: payload.userId }, select: { adminLevel: true } }),
+ ]);
+ if (adminConfig.messagingLocked && (sender?.adminLevel ?? 0) < 3) {
+   return NextResponse.json(
+     { error: 'La messagerie est temporairement desactivee. Seul l\'administrateur peut envoyer des messages.' },
+     { status: 403 },
+   );
+ }
 
  const { groupId, content } = await request.json();
  if (!groupId || !content?.trim()) {

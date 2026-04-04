@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/auth';
 import { getProfileImageUrl, getProfileVisibility } from '@/lib/social';
 import { processMentions } from '@/lib/mention-utils';
+import { getAdminControlConfig } from '@/lib/admin-control-config';
 
 function getToken(request: NextRequest): string | null {
   const auth = request.headers.get('authorization');
@@ -62,7 +63,7 @@ export async function GET(request: NextRequest) {
       take: 100,
       include: {
         user: {
-          select: { id: true, pseudo: true, name: true, email: true, equipmentData: true },
+          select: { id: true, pseudo: true, name: true, email: true, equipmentData: true, adminLevel: true },
         },
       },
     });
@@ -168,6 +169,7 @@ export async function GET(request: NextRequest) {
         id: item.id,
         content: item.text,
         createdAt: item.createdAt,
+        pinned: (item.user?.adminLevel ?? 0) >= 3,
         author: {
           id: authorId,
           pseudo: item.user?.pseudo ?? item.user?.name ?? item.user?.email ?? 'Utilisateur',
@@ -184,6 +186,10 @@ export async function GET(request: NextRequest) {
     });
 
     scoredPosts.sort((left, right) => {
+      // Pinned posts (admin) always appear first
+      const leftPinned = left.pinned ? 1 : 0;
+      const rightPinned = right.pinned ? 1 : 0;
+      if (rightPinned !== leftPinned) return rightPinned - leftPinned;
       if (right.recencyBand !== left.recencyBand) return right.recencyBand - left.recencyBand;
       if (right.feedScore !== left.feedScore) return right.feedScore - left.feedScore;
       return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
@@ -207,6 +213,17 @@ export async function POST(request: NextRequest) {
 
     const payload = verifyToken(token);
     if (!payload) return NextResponse.json({ error: 'Token invalide' }, { status: 401 });
+
+    // Check feed lock (admins can always post)
+    const caller = await prisma.user.findUnique({
+      where: { id: payload.userId },
+      select: { adminLevel: true },
+    });
+    const isAdmin = (caller?.adminLevel ?? 0) >= 3;
+    const feedConfig = await getAdminControlConfig();
+    if (feedConfig.feedLocked && !isAdmin) {
+      return NextResponse.json({ error: 'Le fil est temporairement desactive. Seul l\'administrateur peut publier.' }, { status: 403 });
+    }
 
     const body = await request.json().catch(() => ({}));
     const contentRaw = typeof body.content === 'string' ? body.content : '';

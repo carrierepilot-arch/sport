@@ -340,3 +340,12 @@ model Suggestion {
 
   @@index([status, createdAt])
 }
+
+model AdminConfig {
+  id             String   @id @default("singleton")
+  feedLocked     Boolean  @default(false)
+  messagingLocked Boolean @default(false)
+  sectionsJson   String   @default("{}")
+  rateLimitJson  String   @default("{}")
+  updatedAt      DateTime @updatedAt
+}

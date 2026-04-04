@@ -4,6 +4,64 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { UserAvatar } from '@/components/UserAvatar';
 
+// ── Onboarding Classement ──
+function ClassementOnboarding({ onClose }: { onClose: () => void }) {
+ const [step, setStep] = useState(0);
+ const steps = [
+ {
+ title: 'Bienvenue dans le classement',
+ desc: 'Ici tu retrouves les meilleures performances validees de la communaute. Compare-toi aux autres athletes et grimpe dans le classement.',
+ },
+ {
+ title: 'Classement par exercice',
+ desc: 'Selectionne un exercice (tractions, pompes, dips...) pour voir qui detient le meilleur score. Chaque performance doit etre validee par la communaute.',
+ },
+ {
+ title: 'Classement par ville',
+ desc: 'Decouvre les athletes les plus performants dans ta ville. Represente ton spot et ta communaute locale.',
+ },
+ {
+ title: 'Classement par lieu sportif',
+ desc: 'Chaque spot de street workout a son propre classement. Trouve les meilleurs athletes de ton parc habituel.',
+ },
+ ];
+
+ return (
+ <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
+ <div className="w-full max-w-md rounded-3xl bg-white shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+ <div className="px-6 py-5 border-b border-gray-100">
+ <div className="flex items-center justify-between">
+  <p className="text-xs text-gray-400 font-semibold uppercase tracking-widest">Guide - {step + 1}/{steps.length}</p>
+  <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">
+  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+  </button>
+ </div>
+ <h2 className="text-xl font-black text-gray-900 mt-2">{steps[step].title}</h2>
+ </div>
+ <div className="px-6 py-5">
+ <p className="text-sm text-gray-600 leading-relaxed">{steps[step].desc}</p>
+ </div>
+ <div className="flex items-center gap-3 px-6 py-4 border-t border-gray-100">
+ <div className="flex gap-1.5 flex-1">
+  {steps.map((_, i) => (
+  <div key={i} className={`h-1.5 flex-1 rounded-full transition-all ${i <= step ? 'bg-gray-900' : 'bg-gray-200'}`} />
+  ))}
+ </div>
+ {step < steps.length - 1 ? (
+  <button onClick={() => setStep(step + 1)} className="px-5 py-2.5 rounded-xl bg-gray-900 text-white text-sm font-bold hover:bg-gray-700 transition">
+  Suivant
+  </button>
+ ) : (
+  <button onClick={onClose} className="px-5 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 transition">
+  Compris
+  </button>
+ )}
+ </div>
+ </div>
+ </div>
+ );
+}
+
 interface LeaderboardEntry {
  rank: number;
  elo: number;
@@ -73,11 +131,17 @@ export default function ClassementPage() {
  const [myUserId, setMyUserId] = useState<string | null>(null);
  const [teams, setTeams] = useState<TeamLeaderboardEntry[]>([]);
  const [cities, setCities] = useState<CityLeaderboardEntry[]>([]);
+ const [showOnboarding, setShowOnboarding] = useState(false);
 
  useEffect(() => {
  const raw = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
  if (raw) {
  try { setMyUserId(JSON.parse(raw).id ?? null); } catch { /* */ }
+ }
+ // Show onboarding once
+ if (typeof window !== 'undefined') {
+ const seen = localStorage.getItem('classement_onboarding_seen');
+ if (!seen) setShowOnboarding(true);
  }
  }, []);
 
@@ -134,10 +198,24 @@ export default function ClassementPage() {
 
  return (
  <div className="min-h-screen bg-gray-50 w-full overflow-x-hidden">
+ {/* Onboarding guide */}
+ {showOnboarding && (
+ <ClassementOnboarding onClose={() => {
+  setShowOnboarding(false);
+  if (typeof window !== 'undefined') localStorage.setItem('classement_onboarding_seen', '1');
+ }} />
+ )}
  {/* Page header */}
  <div className="bg-white border-b border-gray-100 px-4 md:px-8 py-6">
+ <div className="flex items-center justify-between">
+ <div>
  <h1 className="text-2xl font-black text-gray-900 tracking-tight">Classement</h1>
  <p className="text-sm text-gray-400 mt-0.5">Meilleures performances validées en France</p>
+ </div>
+ <button onClick={() => setShowOnboarding(true)} className="p-2 rounded-xl hover:bg-gray-100 text-gray-400 transition" title="Revoir le guide">
+ <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+ </button>
+ </div>
  </div>
 
  {/* Exercise tabs */}

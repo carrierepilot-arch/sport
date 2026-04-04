@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/auth';
 import { processMentions } from '@/lib/mention-utils';
+import { getAdminControlConfig } from '@/lib/admin-control-config';
 
 export async function POST(
   request: NextRequest,
@@ -13,6 +14,19 @@ export async function POST(
 
     const payload = verifyToken(token);
     if (!payload) return NextResponse.json({ error: 'Token invalide' }, { status: 401 });
+
+    // Check messaging lock — only adminLevel 3 can reply when locked
+    const sender = await prisma.user.findUnique({
+      where: { id: payload.userId },
+      select: { adminLevel: true },
+    });
+    const adminConfig = await getAdminControlConfig();
+    if (adminConfig.messagingLocked && (sender?.adminLevel ?? 0) < 3) {
+      return NextResponse.json(
+        { error: 'La messagerie est temporairement desactivee. Seul l\'administrateur peut envoyer des messages.' },
+        { status: 403 },
+      );
+    }
 
     const { postId } = await params;
     const post = await prisma.suggestion.findUnique({ where: { id: postId } });

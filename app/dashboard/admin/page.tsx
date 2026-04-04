@@ -46,7 +46,20 @@ interface ApiStatsPayload {
 interface TrendDay { label: string; count: number }
 interface TopUser { display: string; email: string; messages: number; friendRequests: number }
 
-type AdminTab = 'overview' | 'users' | 'logs' | 'analytics' | 'performances' | 'suggestions' | 'exerciseScraper' | 'controlCenter' | 'posts';
+type AdminTab = 'overview' | 'users' | 'logs' | 'analytics' | 'performances' | 'suggestions' | 'exerciseScraper' | 'controlCenter' | 'posts' | 'botTest';
+
+interface BotRow {
+ id: string;
+ email: string;
+ name: string | null;
+ pseudo: string | null;
+ level: string;
+ xp: number;
+ suspended: boolean;
+ createdAt: string;
+ profileImageUrl: string | null;
+ _count: { sentMessages: number; sentFriendRequests: number };
+}
 
 interface PerfRow {
  id: string;
@@ -176,6 +189,8 @@ interface ControlCenterPayload {
  config: {
  sections: Record<string, ControlSection>;
  rateLimit: ControlRateLimit;
+ feedLocked: boolean;
+ messagingLocked: boolean;
  updatedAt: string;
  };
  analytics: {
@@ -258,6 +273,103 @@ function actionLabel(action: string): { label: string; color: string } {
  return map[action] ?? { label: action, color: 'bg-gray-100 text-gray-600' };
 }
 
+// ── Bot Creation Form ──
+function BotCreationForm({ onCreated }: { onCreated: () => void }) {
+ const [open, setOpen] = useState(false);
+ const [name, setName] = useState('');
+ const [pseudo, setPseudo] = useState('');
+ const [behavior, setBehavior] = useState('actif');
+ const [interactionType, setInteractionType] = useState('feed');
+ const [frequency, setFrequency] = useState('quotidien');
+ const [creating, setCreating] = useState(false);
+ const [result, setResult] = useState<string | null>(null);
+
+ const handleCreate = async () => {
+ if (!name.trim() || !pseudo.trim()) return;
+ setCreating(true);
+ setResult(null);
+ try {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  const res = await fetch('/api/admin/bots/create', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+  body: JSON.stringify({ name, pseudo, behavior, interactionType, frequency }),
+  });
+  const data = await res.json();
+  if (res.ok) {
+  setResult(`Bot cree : @${data.bot?.pseudo} (${data.bot?.email})`);
+  setName('');
+  setPseudo('');
+  onCreated();
+  } else {
+  setResult(`Erreur : ${data.error || 'Echec'}`);
+  }
+ } catch {
+  setResult('Erreur reseau');
+ }
+ setCreating(false);
+ };
+
+ if (!open) {
+ return (
+  <button onClick={() => setOpen(true)} className="w-full rounded-xl border-2 border-dashed border-gray-300 bg-white p-4 text-sm font-semibold text-gray-600 hover:border-gray-400 hover:text-gray-800 transition">
+  + Creer un nouveau bot
+  </button>
+ );
+ }
+
+ return (
+ <div className="rounded-xl border border-gray-200 bg-white p-4 sm:p-5 space-y-3">
+  <div className="flex items-center justify-between">
+  <h3 className="text-sm font-semibold text-gray-900">Creer un bot</h3>
+  <button onClick={() => setOpen(false)} className="text-xs text-gray-400 hover:text-gray-600">Fermer</button>
+  </div>
+  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+  <label className="block text-xs font-semibold text-gray-700">
+   Nom
+   <input value={name} onChange={(e) => setName(e.target.value)} placeholder="ex: Ahmed Bot" className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+  </label>
+  <label className="block text-xs font-semibold text-gray-700">
+   Pseudo
+   <input value={pseudo} onChange={(e) => setPseudo(e.target.value)} placeholder="ex: ahmed_bot" className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+  </label>
+  <label className="block text-xs font-semibold text-gray-700">
+   Comportement
+   <select value={behavior} onChange={(e) => setBehavior(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+   <option value="actif">Actif (publie regulierement)</option>
+   <option value="social">Social (interactions, likes, reponses)</option>
+   <option value="performeur">Performeur (soumet des scores)</option>
+   <option value="passif">Passif (presence uniquement)</option>
+   </select>
+  </label>
+  <label className="block text-xs font-semibold text-gray-700">
+   Type d&apos;interaction
+   <select value={interactionType} onChange={(e) => setInteractionType(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+   <option value="feed">Feed (posts, likes)</option>
+   <option value="messages">Messages prives</option>
+   <option value="performances">Performances</option>
+   <option value="mixte">Mixte (tout)</option>
+   </select>
+  </label>
+  <label className="block text-xs font-semibold text-gray-700">
+   Frequence
+   <select value={frequency} onChange={(e) => setFrequency(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+   <option value="quotidien">Quotidien</option>
+   <option value="hebdomadaire">Hebdomadaire</option>
+   <option value="occasionnel">Occasionnel</option>
+   </select>
+  </label>
+  </div>
+  <div className="flex items-center gap-3">
+  <button onClick={handleCreate} disabled={creating || !name.trim() || !pseudo.trim()} className="px-4 py-2 rounded-xl bg-purple-600 text-white text-sm font-bold hover:bg-purple-500 disabled:opacity-50 transition">
+   {creating ? 'Creation...' : 'Creer le bot'}
+  </button>
+  {result && <p className={`text-xs font-medium ${result.startsWith('Erreur') ? 'text-red-600' : 'text-emerald-600'}`}>{result}</p>}
+  </div>
+ </div>
+ );
+}
+
 export default function AdminPage() {
  const router = useRouter();
  const [tab, setTab] = useState<AdminTab>('overview');
@@ -329,9 +441,130 @@ export default function AdminPage() {
  const [exercisesLoading, setExercisesLoading] = useState(false);
  const [controlCenter, setControlCenter] = useState<ControlCenterPayload | null>(null);
  const [savingControlCenter, setSavingControlCenter] = useState(false);
+ const [deletingContent, setDeletingContent] = useState<string | null>(null);
+ const [messagingLockedUI, setMessagingLockedUI] = useState(false);
+ const [togglingMessaging, setTogglingMessaging] = useState(false);
  const [scraperCandidates, setScraperCandidates] = useState<ScraperCandidate[]>([]);
  const [candidatesLoading, setCandidatesLoading] = useState(false);
  const [candidateSelection, setCandidateSelection] = useState<Record<string, boolean>>({});
+
+ // ── Bot Test state ──
+ const [bots, setBots] = useState<BotRow[]>([]);
+ const [botsLoading, setBotsLoading] = useState(false);
+ const [selectedBots, setSelectedBots] = useState<Set<string>>(new Set());
+ const [botAction, setBotAction] = useState<'friend_request' | 'message' | 'message_image' | 'feed_post' | 'feed_image' | 'feed_reply' | 'performance_create'>('friend_request');
+ const [botTargetPseudo, setBotTargetPseudo] = useState('');
+ const [botContent, setBotContent] = useState('');
+ const [botPostId, setBotPostId] = useState('');
+ const [botImageFile, setBotImageFile] = useState<File | null>(null);
+ const [botPerfVideoFile, setBotPerfVideoFile] = useState<File | null>(null);
+ const [botPerfExercise, setBotPerfExercise] = useState('tractions');
+ const [botPerfScore, setBotPerfScore] = useState('10');
+ const [botPerfVisibility, setBotPerfVisibility] = useState<'public' | 'private'>('public');
+ const [botActionLoading, setBotActionLoading] = useState(false);
+ const [botActionResult, setBotActionResult] = useState<{ ok: boolean; message: string } | null>(null);
+ const [feedPostsForBots, setFeedPostsForBots] = useState<Array<{ id: string; content: string; author: { pseudo: string } }>>([]);
+ const [adminLevel, setAdminLevelState] = useState<number>(0);
+
+ const loadBots = useCallback(async () => {
+ setBotsLoading(true);
+ try {
+ const res = await fetch('/api/admin/bots', { headers: authHeader() });
+ if (res.ok) {
+ const d = await res.json();
+ setBots(d.bots ?? []);
+ }
+ } finally {
+ setBotsLoading(false);
+ }
+ }, []);
+
+ const runBotAction = async () => {
+ if (selectedBots.size === 0) {
+ setBotActionResult({ ok: false, message: 'Sélectionnez au moins un bot.' });
+ return;
+ }
+ if ((botAction === 'friend_request' || botAction === 'message' || botAction === 'message_image') && !botTargetPseudo.trim()) {
+ setBotActionResult({ ok: false, message: 'Pseudo cible requis.' });
+ return;
+ }
+ if ((botAction === 'message' || botAction === 'feed_post' || botAction === 'feed_reply') && !botContent.trim()) {
+ setBotActionResult({ ok: false, message: 'Contenu requis.' });
+ return;
+ }
+ if ((botAction === 'message_image' || botAction === 'feed_image') && !botImageFile) {
+ setBotActionResult({ ok: false, message: 'Image requise pour cette action.' });
+ return;
+ }
+ if (botAction === 'feed_reply' && !botPostId.trim()) {
+ setBotActionResult({ ok: false, message: 'Post parent requis pour une réponse.' });
+ return;
+ }
+ if (botAction === 'performance_create') {
+ const score = Number(botPerfScore);
+ if (!Number.isFinite(score) || score <= 0) {
+ setBotActionResult({ ok: false, message: 'Score de performance invalide.' });
+ return;
+ }
+ }
+
+ setBotActionLoading(true);
+ setBotActionResult(null);
+ try {
+ const results: string[] = [];
+ for (const botId of selectedBots) {
+ const bot = bots.find((b) => b.id === botId);
+ const useMultipart = botAction === 'message_image' || botAction === 'feed_image' || botAction === 'performance_create';
+ let res: Response;
+ if (useMultipart) {
+ const formData = new FormData();
+ formData.append('botId', botId);
+ formData.append('action', botAction);
+ formData.append('targetPseudo', botTargetPseudo.trim());
+ formData.append('content', botContent.trim());
+ formData.append('postId', botPostId.trim());
+ if (botAction === 'performance_create') {
+ formData.append('exercise', botPerfExercise);
+ formData.append('score', botPerfScore);
+ formData.append('visibility', botPerfVisibility);
+ if (botPerfVideoFile) formData.append('video', botPerfVideoFile);
+ }
+ if (botImageFile) formData.append('image', botImageFile);
+ const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+ res = await fetch('/api/admin/bots/act', {
+ method: 'POST',
+ headers: token ? { Authorization: `Bearer ${token}` } : {},
+ body: formData,
+ });
+ } else {
+ res = await fetch('/api/admin/bots/act', {
+ method: 'POST',
+ headers: authHeader(),
+ body: JSON.stringify({
+ botId,
+ action: botAction,
+ payload: {
+ targetPseudo: botTargetPseudo.trim(),
+ content: botContent.trim(),
+ postId: botPostId.trim(),
+ },
+ }),
+ });
+ }
+ const d = await res.json().catch(() => ({}));
+ if (res.ok) {
+ results.push(`✅ @${bot?.pseudo ?? botId} : OK`);
+ } else {
+ results.push(`❌ @${bot?.pseudo ?? botId} : ${d?.error || `Erreur ${res.status}`}`);
+ }
+ }
+ setBotActionResult({ ok: true, message: results.join('\n') });
+ } catch {
+ setBotActionResult({ ok: false, message: 'Erreur réseau pendant l\'exécution.' });
+ } finally {
+ setBotActionLoading(false);
+ }
+ };
 
  const charger = useCallback(async () => {
  setLoading(true);
@@ -918,7 +1151,7 @@ export default function AdminPage() {
  const res = await fetch('/api/admin/control-center', {
  method: 'PATCH',
  headers: authHeader(),
- body: JSON.stringify({ sectionUpdates, rateLimit: controlCenter.config.rateLimit }),
+ body: JSON.stringify({ sectionUpdates, rateLimit: controlCenter.config.rateLimit, feedLocked: controlCenter.config.feedLocked, messagingLocked: controlCenter.config.messagingLocked }),
  });
  const data = await res.json().catch(() => ({}));
  if (res.ok && data.config) {
@@ -931,6 +1164,56 @@ export default function AdminPage() {
  alert('Erreur reseau');
  }
  setSavingControlCenter(false);
+ };
+
+ const deleteContent = async (action: 'scores' | 'videos' | 'feed_posts' | 'users' | 'all') => {
+ const labels: Record<string, string> = {
+ scores: 'tous les scores et performances',
+ videos: 'toutes les videos (blob + DB)',
+ feed_posts: 'tous les posts du fil',
+ users: 'tous les utilisateurs non-admins',
+ all: 'TOUT le contenu (scores, videos, posts)',
+ };
+ const confirmed = window.confirm(`Confirmer la suppression de ${labels[action]} ? Cette action est irreversible.`);
+ if (!confirmed) return;
+ setDeletingContent(action);
+ try {
+ const res = await fetch('/api/admin/content/delete', {
+ method: 'POST',
+ headers: authHeader(),
+ body: JSON.stringify({ action }),
+ });
+ const data = await res.json().catch(() => ({}));
+ if (res.ok) {
+ alert(`Suppression reussie : ${JSON.stringify(data.deleted ?? {})}`);
+ } else {
+ alert(data.error || 'Erreur lors de la suppression');
+ }
+ } catch {
+ alert('Erreur reseau');
+ }
+ setDeletingContent(null);
+ };
+
+ const toggleMessagingLock = async () => {
+ setTogglingMessaging(true);
+ try {
+ const res = await fetch('/api/admin/control-center', {
+ method: 'PATCH',
+ headers: authHeader(),
+ body: JSON.stringify({ messagingLocked: !messagingLockedUI }),
+ });
+ const data = await res.json().catch(() => ({}));
+ if (res.ok) {
+ setMessagingLockedUI(!messagingLockedUI);
+ alert(messagingLockedUI ? 'Messagerie autorisee.' : 'Messagerie verrouillee.');
+ } else {
+ alert(data.error || `Erreur HTTP ${res.status} lors de la mise a jour`);
+ }
+ } catch {
+ alert('Erreur reseau');
+ }
+ setTogglingMessaging(false);
  };
 
  const saveValidatedCandidates = async () => {
@@ -1087,6 +1370,25 @@ export default function AdminPage() {
  return () => clearInterval(interval);
  }, [tab, loadSupabaseStats]);
 
+ // Detect own admin level with a dedicated protected endpoint.
+ useEffect(() => {
+ const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+ if (!token) return;
+ fetch('/api/admin/bots', { headers: authHeader() })
+ .then((r) => {
+ if (r.ok) setAdminLevelState(3);
+ else if (r.status === 403) setAdminLevelState(1);
+ })
+ .catch(() => {});
+ }, []);
+
+ // Guard against forced navigation to botTest for non-level-3 admins.
+ useEffect(() => {
+ if (tab === 'botTest' && adminLevel < 3) {
+ setTab('overview');
+ }
+ }, [tab, adminLevel]);
+
  if (loading) {
  return (
  <main className="flex-1 flex items-center justify-center p-4">
@@ -1097,6 +1399,7 @@ export default function AdminPage() {
  </main>
  );
  }
+
  if (error) return <main className="flex-1 flex items-center justify-center p-4"><p className="text-red-600">{error}</p></main>;
 
  return (
@@ -1138,6 +1441,7 @@ export default function AdminPage() {
  { key: 'exerciseScraper', label: ` Scraper exos (${scraperDbCount})`, shortLabel: ` (${scraperDbCount})` },
  { key: 'controlCenter', label: ' Controle total N3', shortLabel: ' N3' },
  { key: 'analytics', label: ' Analytics', shortLabel: ' Stats' },
+ ...(adminLevel >= 3 ? [{ key: 'botTest' as AdminTab, label: ' Test', shortLabel: ' Test' }] : []),
  ] as { key: AdminTab; label: string; shortLabel: string }[]).map((t) => (
  <button
  key={t.key}
@@ -1151,9 +1455,25 @@ export default function AdminPage() {
  .then(d => setFeedPosts(Array.isArray(d.posts) ? d.posts : []))
  .catch(() => {})
  .finally(() => setFeedPostsLoading(false));
+ // Load messaging lock state
+ fetch('/api/admin/control-center', { headers: authHeader() })
+ .then(r => r.json())
+ .then(d => d.config?.messagingLocked !== undefined && setMessagingLockedUI(d.config.messagingLocked))
+ .catch(() => {});
+ }
+ if (t.key === 'botTest') {
+ void loadBots();
+ fetch('/api/feed?scope=all&limit=100', { headers: authHeader() })
+ .then(r => r.json())
+ .then(d => setFeedPostsForBots(Array.isArray(d.posts) ? d.posts : []))
+ .catch(() => {});
  }
  }}
- className={`px-2.5 sm:px-5 py-2 rounded-lg text-xs sm:text-sm font-medium transition whitespace-nowrap ${tab === t.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+ className={`px-2.5 sm:px-5 py-2 rounded-lg text-xs sm:text-sm font-medium transition whitespace-nowrap ${
+ t.key === 'botTest'
+ ? (tab === t.key ? 'bg-purple-700 text-white shadow-sm' : 'bg-purple-100 text-purple-700 hover:bg-purple-200')
+ : (tab === t.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700')
+ }`}>
  <span className="sm:hidden">{t.shortLabel}</span>
  <span className="hidden sm:inline">{t.label}</span>
  </button>
@@ -1321,6 +1641,15 @@ export default function AdminPage() {
  <span className="px-3 py-2 text-xs sm:text-sm text-gray-400 bg-gray-50 rounded-lg border border-gray-200 whitespace-nowrap text-center">
  {filteredUsers.length}
  </span>
+ {adminLevel >= 3 && (
+ <button
+ onClick={() => void deleteContent('users')}
+ disabled={!!deletingContent}
+ className="px-3 py-2 text-xs sm:text-sm rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700 disabled:opacity-50 whitespace-nowrap"
+ >
+ {deletingContent === 'users' ? 'Suppression...' : 'Tout supprimer'}
+ </button>
+ )}
  </div>
  </div>
 
@@ -1580,6 +1909,29 @@ export default function AdminPage() {
  <h2 className="text-lg font-black text-gray-900">Modération des posts</h2>
  <p className="text-sm text-gray-500">Supprimez les publications inappropriées du feed.</p>
  </div>
+ <div className="flex items-center gap-2">
+ {adminLevel >= 3 && (
+ <>
+ <button
+ onClick={() => void deleteContent('feed_posts')}
+ disabled={!!deletingContent}
+ className="rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50"
+ >
+ {deletingContent === 'feed_posts' ? 'Suppression...' : 'Tout supprimer'}
+ </button>
+ <button
+ onClick={() => void toggleMessagingLock()}
+ disabled={togglingMessaging}
+ className={`rounded-xl px-4 py-2 text-sm font-bold transition ${
+ messagingLockedUI
+ ? 'bg-rose-600 text-white hover:bg-rose-700'
+ : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+ } disabled:opacity-50`}
+ >
+ {togglingMessaging ? 'Mise a jour...' : messagingLockedUI ? 'Autoriser messages' : 'Bloquer messages'}
+ </button>
+ </>
+ )}
  <button
  onClick={() => {
  setFeedPostsLoading(true);
@@ -1593,6 +1945,7 @@ export default function AdminPage() {
  >
  Actualiser
  </button>
+ </div>
  </div>
  {feedPostsLoading ? (
  <div className="py-12 text-center text-sm text-gray-400">Chargement des posts...</div>
@@ -1781,6 +2134,15 @@ export default function AdminPage() {
  <h2 className="text-sm font-semibold text-gray-900">Gestion des performances</h2>
  <p className="text-xs text-gray-400 mt-0.5">{filteredPerformances.length} performance{filteredPerformances.length !== 1 ? 's' : ''} affichée{filteredPerformances.length !== 1 ? 's' : ''}</p>
  </div>
+ {adminLevel >= 3 && (
+ <button
+ onClick={() => void deleteContent('scores')}
+ disabled={!!deletingContent}
+ className="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 disabled:opacity-50"
+ >
+ {deletingContent === 'scores' ? 'Suppression...' : 'Tout supprimer'}
+ </button>
+ )}
  </div>
  <div className="px-4 sm:px-6 py-4 border-b border-gray-100 grid grid-cols-1 md:grid-cols-3 gap-3">
  <input
@@ -2652,6 +3014,370 @@ export default function AdminPage() {
  </table>
  </div>
  )}
+ </div>
+
+ {/* ── FEED LOCK ── */}
+ <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-5">
+ <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+ <div>
+ <h2 className="text-sm font-semibold text-gray-900">Verrouillage du fil</h2>
+ <p className="text-xs text-gray-400 mt-0.5">
+ {controlCenter.config.feedLocked
+ ? 'Fil verrouille — seul l\'admin peut publier.'
+ : 'Fil ouvert — tous les membres peuvent publier.'}
+ </p>
+ </div>
+ <button
+ onClick={() =>
+ setControlCenter((prev) =>
+ prev
+ ? { ...prev, config: { ...prev.config, feedLocked: !prev.config.feedLocked } }
+ : prev
+ )
+ }
+ className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${
+ controlCenter.config.feedLocked
+ ? 'bg-rose-600 text-white hover:bg-rose-700'
+ : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+ }`}
+ >
+ {controlCenter.config.feedLocked ? 'Deverrouiller le fil' : 'Verrouiller le fil'}
+ </button>
+ </div>
+ <p className="text-xs text-gray-400 mt-2">Cliquez sur "Sauvegarder" en haut pour appliquer.</p>
+ </div>
+
+ {/* ── MESSAGING LOCK ── */}
+ <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-5">
+ <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+ <div>
+ <h2 className="text-sm font-semibold text-gray-900">Verrouillage de la messagerie</h2>
+ <p className="text-xs text-gray-400 mt-0.5">
+ {controlCenter.config.messagingLocked
+ ? 'Messagerie verrouillee — aucun envoi de messages allowed.'
+ : 'Messagerie ouverte — tous les membres peuvent envoyer des messages.'}
+ </p>
+ </div>
+ <button
+ onClick={() =>
+ setControlCenter((prev) =>
+ prev
+ ? { ...prev, config: { ...prev.config, messagingLocked: !prev.config.messagingLocked } }
+ : prev
+ )
+ }
+ className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${
+ controlCenter.config.messagingLocked
+ ? 'bg-rose-600 text-white hover:bg-rose-700'
+ : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+ }`}
+ >
+ {controlCenter.config.messagingLocked ? 'Autoriser les messages' : 'Bloquer les messages'}
+ </button>
+ </div>
+ <p className="text-xs text-gray-400 mt-2">Cliquez sur "Sauvegarder" en haut pour appliquer.</p>
+ </div>
+
+ {/* ── ZONE DANGER ── */}
+ {adminLevel >= 3 ? (
+ <div className="bg-white border border-red-200 rounded-xl p-4 sm:p-5">
+ <h2 className="text-sm font-semibold text-red-700">Zone de suppression (irreversible)</h2>
+ <p className="text-xs text-red-400 mt-0.5 mb-4">Chaque action est irreversible et supprime definitivement les donnees. Acces reserve au super-admin (niveau 3).</p>
+ <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+ <button
+ onClick={() => void deleteContent('scores')}
+ disabled={!!deletingContent}
+ className="px-4 py-3 rounded-xl border border-red-200 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50 text-left"
+ >
+ <span className="block text-xs font-medium text-red-400 mb-1">Scores</span>
+ Supprimer tous les scores
+ </button>
+ <button
+ onClick={() => void deleteContent('videos')}
+ disabled={!!deletingContent}
+ className="px-4 py-3 rounded-xl border border-red-200 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50 text-left"
+ >
+ <span className="block text-xs font-medium text-red-400 mb-1">Videos</span>
+ Supprimer toutes les videos
+ </button>
+ <button
+ onClick={() => void deleteContent('feed_posts')}
+ disabled={!!deletingContent}
+ className="px-4 py-3 rounded-xl border border-red-200 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50 text-left"
+ >
+ <span className="block text-xs font-medium text-red-400 mb-1">Posts</span>
+ Supprimer tous les posts du fil
+ </button>
+ <button
+ onClick={() => void deleteContent('all')}
+ disabled={!!deletingContent}
+ className="px-4 py-3 rounded-xl border border-red-600 bg-red-600 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50 text-left"
+ >
+ <span className="block text-xs font-medium text-red-200 mb-1">Reset total</span>
+ Tout supprimer
+ </button>
+ </div>
+ {deletingContent && (
+ <p className="mt-3 text-xs text-red-500 font-medium">Suppression en cours ({deletingContent})…</p>
+ )}
+ </div>
+ ) : (
+ <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 sm:p-5">
+ <h2 className="text-sm font-semibold text-gray-500">Zone de suppression</h2>
+ <p className="text-xs text-gray-400 mt-1">Acces reserve au super-admin (niveau 3 uniquement).</p>
+ </div>
+ )}
+
+ </>
+ )}
+ </div>
+ )}
+ {tab === 'botTest' && (
+ <div className="space-y-5">
+ {adminLevel < 3 ? (
+ <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+ Acces reserve au super-admin (niveau 3).
+ </div>
+ ) : (
+ <>
+ <div className="rounded-xl border border-purple-200 bg-purple-50 p-4 sm:p-5">
+ <h2 className="text-sm font-semibold text-purple-900">Rubrique Test (interne)</h2>
+ <p className="mt-1 text-xs text-purple-700">
+ Simulation avancee bots: messages image, posts image, performances et videos pour tester la moderation et l'affichage.
+ </p>
+ </div>
+
+ {/* ── Bot Creation ── */}
+ <BotCreationForm onCreated={() => void loadBots()} />
+
+ <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+ <section className="rounded-xl border border-gray-200 bg-white p-4 sm:p-5">
+ <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+ <div>
+ <h3 className="text-sm font-semibold text-gray-900">Comptes bots / test</h3>
+ <p className="text-xs text-gray-500 mt-0.5">Selection multiple autorisee.</p>
+ </div>
+ <div className="flex items-center gap-2">
+ <button
+ onClick={() => setSelectedBots(new Set(bots.map((b) => b.id)))}
+ className="px-2 py-1 text-xs border border-gray-200 rounded-md hover:border-gray-400"
+ >
+ Tout selectionner
+ </button>
+ <button
+ onClick={() => setSelectedBots(new Set())}
+ className="px-2 py-1 text-xs border border-gray-200 rounded-md hover:border-gray-400"
+ >
+ Vider
+ </button>
+ <button
+ onClick={() => void loadBots()}
+ className="px-2 py-1 text-xs border border-gray-200 rounded-md hover:border-gray-400"
+ >
+ Actualiser
+ </button>
+ </div>
+ </div>
+
+ <div className="mb-3 text-xs text-gray-600">
+ {selectedBots.size} bot{selectedBots.size > 1 ? 's' : ''} selectionne{selectedBots.size > 1 ? 's' : ''}
+ </div>
+
+ <div className="max-h-[420px] overflow-y-auto rounded-lg border border-gray-100">
+ {botsLoading ? (
+ <div className="p-4 text-sm text-gray-500">Chargement...</div>
+ ) : bots.length === 0 ? (
+ <div className="p-4 text-sm text-gray-500">Aucun compte bot/test detecte.</div>
+ ) : (
+ <table className="w-full text-xs">
+ <thead className="bg-gray-50 border-b border-gray-100 sticky top-0">
+ <tr>
+ <th className="text-left px-3 py-2">Sel.</th>
+ <th className="text-left px-3 py-2">Compte</th>
+ <th className="text-left px-3 py-2">Email</th>
+ <th className="text-right px-3 py-2">Actions</th>
+ </tr>
+ </thead>
+ <tbody className="divide-y divide-gray-100">
+ {bots.map((bot) => (
+ <tr key={bot.id}>
+ <td className="px-3 py-2 align-top">
+ <input
+ type="checkbox"
+ checked={selectedBots.has(bot.id)}
+ onChange={(e) => {
+ const checked = e.target.checked;
+ setSelectedBots((prev) => {
+ const next = new Set(prev);
+ if (checked) next.add(bot.id);
+ else next.delete(bot.id);
+ return next;
+ });
+ }}
+ />
+ </td>
+ <td className="px-3 py-2 align-top">
+ <p className="font-semibold text-gray-900">@{bot.pseudo || bot.name || 'bot'}</p>
+ <p className="text-[11px] text-gray-500">{bot.name || 'Sans nom'}</p>
+ </td>
+ <td className="px-3 py-2 align-top text-gray-600">{bot.email}</td>
+ <td className="px-3 py-2 align-top text-right text-gray-500">
+ {bot._count.sentMessages + bot._count.sentFriendRequests}
+ </td>
+ </tr>
+ ))}
+ </tbody>
+ </table>
+ )}
+ </div>
+ </section>
+
+ <section className="rounded-xl border border-gray-200 bg-white p-4 sm:p-5 space-y-4">
+ <div>
+ <h3 className="text-sm font-semibold text-gray-900">Action de simulation</h3>
+ <p className="text-xs text-gray-500 mt-0.5">Toutes les actions sont executees au nom des bots selectionnes.</p>
+ </div>
+
+ <label className="block text-xs font-semibold text-gray-700">
+ Type d'action
+ <select
+ value={botAction}
+ onChange={(e) => setBotAction(e.target.value as 'friend_request' | 'message' | 'message_image' | 'feed_post' | 'feed_image' | 'feed_reply' | 'performance_create')}
+ className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900"
+ >
+ <option value="friend_request">Envoyer des demandes d'amis</option>
+ <option value="message">Envoyer des messages prives</option>
+ <option value="message_image">Envoyer un message avec image</option>
+ <option value="feed_post">Publier un post texte (feed)</option>
+ <option value="feed_image">Publier un post image (feed)</option>
+ <option value="feed_reply">Repondre a un post du feed</option>
+ <option value="performance_create">Creer une performance (video optionnelle)</option>
+ </select>
+ </label>
+
+ {(botAction === 'friend_request' || botAction === 'message' || botAction === 'message_image') && (
+ <label className="block text-xs font-semibold text-gray-700">
+ Pseudo cible
+ <input
+ value={botTargetPseudo}
+ onChange={(e) => setBotTargetPseudo(e.target.value)}
+ placeholder="ex: Ghiles"
+ className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900"
+ />
+ </label>
+ )}
+
+ {(botAction === 'message' || botAction === 'feed_post' || botAction === 'feed_reply' || botAction === 'message_image' || botAction === 'feed_image') && (
+ <label className="block text-xs font-semibold text-gray-700">
+ Contenu (texte / legende)
+ <textarea
+ value={botContent}
+ onChange={(e) => setBotContent(e.target.value)}
+ rows={4}
+ className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900"
+ placeholder={botAction === 'feed_post' ? 'Texte du post...' : 'Texte du message/reponse/legende...'}
+ />
+ </label>
+ )}
+
+ {(botAction === 'message_image' || botAction === 'feed_image') && (
+ <label className="block text-xs font-semibold text-gray-700">
+ Image
+ <input
+ type="file"
+ accept="image/*"
+ onChange={(e) => setBotImageFile(e.target.files?.[0] ?? null)}
+ className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900"
+ />
+ </label>
+ )}
+
+ {botAction === 'feed_reply' && (
+ <label className="block text-xs font-semibold text-gray-700">
+ Post parent
+ <select
+ value={botPostId}
+ onChange={(e) => setBotPostId(e.target.value)}
+ className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900"
+ >
+ <option value="">Selectionner un post</option>
+ {feedPostsForBots.map((post) => (
+ <option key={post.id} value={post.id}>
+ @{post.author.pseudo}: {post.content.slice(0, 60)}
+ </option>
+ ))}
+ </select>
+ </label>
+ )}
+
+ {botAction === 'performance_create' && (
+ <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+ <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+ <label className="block text-xs font-semibold text-gray-700">
+ Exercice
+ <select
+ value={botPerfExercise}
+ onChange={(e) => setBotPerfExercise(e.target.value)}
+ className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900"
+ >
+ <option value="tractions">Tractions</option>
+ <option value="pompes">Pompes</option>
+ <option value="dips">Dips</option>
+ <option value="squats">Squats</option>
+ <option value="muscle_ups">Muscle-ups</option>
+ <option value="tractions_lestees">Tractions lestees</option>
+ <option value="dips_lestes">Dips lestes</option>
+ </select>
+ </label>
+ <label className="block text-xs font-semibold text-gray-700">
+ Score
+ <input
+ type="number"
+ min="0.1"
+ step="0.1"
+ value={botPerfScore}
+ onChange={(e) => setBotPerfScore(e.target.value)}
+ className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900"
+ />
+ </label>
+ <label className="block text-xs font-semibold text-gray-700">
+ Visibilite
+ <select
+ value={botPerfVisibility}
+ onChange={(e) => setBotPerfVisibility(e.target.value as 'public' | 'private')}
+ className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900"
+ >
+ <option value="public">Public</option>
+ <option value="private">Prive</option>
+ </select>
+ </label>
+ </div>
+ <label className="block text-xs font-semibold text-gray-700">
+ Video (optionnelle)
+ <input
+ type="file"
+ accept="video/mp4,video/webm,video/quicktime,.zip"
+ onChange={(e) => setBotPerfVideoFile(e.target.files?.[0] ?? null)}
+ className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900"
+ />
+ </label>
+ </div>
+ )}
+
+ <button
+ onClick={() => void runBotAction()}
+ disabled={botActionLoading || selectedBots.size === 0}
+ className="w-full rounded-lg bg-purple-700 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-800 disabled:opacity-50"
+ >
+ {botActionLoading ? 'Execution...' : `Executer sur ${selectedBots.size} bot${selectedBots.size > 1 ? 's' : ''}`}
+ </button>
+
+ {botActionResult && (
+ <div className={`rounded-lg border px-3 py-3 text-xs whitespace-pre-wrap ${botActionResult.ok ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-700'}`}>
+ {botActionResult.message}
+ </div>
+ )}
+ </section>
  </div>
  </>
  )}

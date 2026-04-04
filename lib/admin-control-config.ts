@@ -1,5 +1,4 @@
-import fs from 'node:fs/promises';
-import path from 'node:path';
+﻿import { prisma } from '@/lib/prisma';
 
 export type SectionStatus = 'active' | 'disabled' | 'standby' | 'stopped' | 'hidden';
 
@@ -26,10 +25,12 @@ export type AdminControlConfig = {
   version: number;
   sections: Record<string, SectionControl>;
   rateLimit: RateLimitConfig;
+  feedLocked: boolean;
+  messagingLocked: boolean;
   updatedAt: string;
 };
 
-const CONFIG_PATH = path.join(process.cwd(), 'scripts', 'output', 'admin-control-config.json');
+// Short-lived in-memory cache (valid for one serverless invocation only).
 let inMemoryConfig: AdminControlConfig | null = null;
 
 const SECTION_DEFINITIONS: SectionDefinition[] = [
@@ -71,26 +72,24 @@ function createDefaultConfig(): AdminControlConfig {
       updatedAt: now,
     };
   }
-
   return {
     version: 1,
     sections,
     rateLimit: DEFAULT_RATE_LIMIT,
+    feedLocked: false,
+    messagingLocked: false,
     updatedAt: now,
   };
 }
 
-function sanitizeConfig(input: unknown): AdminControlConfig {
-  const fallback = createDefaultConfig();
-  if (!input || typeof input !== 'object') return fallback;
-
-  const source = input as Partial<AdminControlConfig>;
+function sanitizeSections(raw: unknown): Record<string, SectionControl> {
+  const source = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
   const now = new Date().toISOString();
   const sections: Record<string, SectionControl> = {};
 
   for (const def of SECTION_DEFINITIONS) {
-    const raw = source.sections?.[def.key];
-    const status = raw?.status;
+    const entry = source[def.key] as Partial<SectionControl> | undefined;
+    const status = entry?.status;
     const safeStatus: SectionStatus =
       status === 'active' || status === 'disabled' || status === 'standby' || status === 'stopped' || status === 'hidden'
         ? status
@@ -99,24 +98,45 @@ function sanitizeConfig(input: unknown): AdminControlConfig {
     sections[def.key] = {
       ...def,
       status: safeStatus,
-      maintenanceMessage: typeof raw?.maintenanceMessage === 'string' ? raw.maintenanceMessage.slice(0, 260) : defaultMessageForStatus(safeStatus),
-      updatedAt: typeof raw?.updatedAt === 'string' ? raw.updatedAt : now,
+      maintenanceMessage:
+        typeof entry?.maintenanceMessage === 'string'
+          ? entry.maintenanceMessage.slice(0, 260)
+          : defaultMessageForStatus(safeStatus),
+      updatedAt: typeof entry?.updatedAt === 'string' ? entry.updatedAt : now,
     };
   }
+  return sections;
+}
 
-  const rate = source.rateLimit;
-  const rateLimit: RateLimitConfig = {
-    enabled: typeof rate?.enabled === 'boolean' ? rate.enabled : DEFAULT_RATE_LIMIT.enabled,
-    maxRequests: Math.max(1, Math.min(50, Number(rate?.maxRequests ?? DEFAULT_RATE_LIMIT.maxRequests))),
-    windowMs: Math.max(250, Math.min(60_000, Number(rate?.windowMs ?? DEFAULT_RATE_LIMIT.windowMs))),
-    mutatingOnly: typeof rate?.mutatingOnly === 'boolean' ? rate.mutatingOnly : DEFAULT_RATE_LIMIT.mutatingOnly,
+function sanitizeRateLimit(raw: unknown): RateLimitConfig {
+  const rate = (raw && typeof raw === 'object' ? raw : {}) as Partial<RateLimitConfig>;
+  return {
+    enabled: typeof rate.enabled === 'boolean' ? rate.enabled : DEFAULT_RATE_LIMIT.enabled,
+    maxRequests: Math.max(1, Math.min(50, Number(rate.maxRequests ?? DEFAULT_RATE_LIMIT.maxRequests))),
+    windowMs: Math.max(250, Math.min(60_000, Number(rate.windowMs ?? DEFAULT_RATE_LIMIT.windowMs))),
+    mutatingOnly: typeof rate.mutatingOnly === 'boolean' ? rate.mutatingOnly : DEFAULT_RATE_LIMIT.mutatingOnly,
   };
+}
+
+function rowToConfig(row: {
+  feedLocked: boolean;
+  messagingLocked: boolean;
+  sectionsJson: string;
+  rateLimitJson: string;
+  updatedAt: Date;
+}): AdminControlConfig {
+  let rawSections: unknown = {};
+  let rawRate: unknown = {};
+  try { rawSections = JSON.parse(row.sectionsJson); } catch { /* use default */ }
+  try { rawRate = JSON.parse(row.rateLimitJson); } catch { /* use default */ }
 
   return {
     version: 1,
-    sections,
-    rateLimit,
-    updatedAt: typeof source.updatedAt === 'string' ? source.updatedAt : now,
+    sections: sanitizeSections(rawSections),
+    rateLimit: sanitizeRateLimit(rawRate),
+    feedLocked: row.feedLocked,
+    messagingLocked: row.messagingLocked,
+    updatedAt: row.updatedAt.toISOString(),
   };
 }
 
@@ -124,30 +144,44 @@ export async function getAdminControlConfig(): Promise<AdminControlConfig> {
   if (inMemoryConfig) return inMemoryConfig;
 
   try {
-    const raw = await fs.readFile(CONFIG_PATH, 'utf8');
-    const parsed = sanitizeConfig(JSON.parse(raw));
-    inMemoryConfig = parsed;
-    return parsed;
-  } catch {
-    const next = createDefaultConfig();
-    inMemoryConfig = next;
-    // On serverless providers, filesystem writes can fail (read-only).
-    // We still serve a valid config from memory instead of throwing 500.
-    try {
-      await saveAdminControlConfig(next);
-    } catch {
-      // Ignore persistence error and keep serving in-memory config.
+    const row = await prisma.adminConfig.findUnique({ where: { id: 'singleton' } });
+    if (row) {
+      inMemoryConfig = rowToConfig(row);
+      return inMemoryConfig;
     }
-    return next;
+  } catch (err) {
+    console.error('[AdminConfig] DB read error:', err);
   }
+
+  const def = createDefaultConfig();
+  inMemoryConfig = def;
+  try {
+    await saveAdminControlConfig(def);
+  } catch {
+    // Ignore — in-memory fallback will be served.
+  }
+  return def;
 }
 
 export async function saveAdminControlConfig(config: AdminControlConfig): Promise<void> {
-  const sanitized = sanitizeConfig(config);
-  inMemoryConfig = sanitized;
+  inMemoryConfig = config;
 
-  await fs.mkdir(path.dirname(CONFIG_PATH), { recursive: true });
-  await fs.writeFile(CONFIG_PATH, JSON.stringify(sanitized, null, 2), 'utf8');
+  await prisma.adminConfig.upsert({
+    where: { id: 'singleton' },
+    update: {
+      feedLocked: config.feedLocked,
+      messagingLocked: config.messagingLocked,
+      sectionsJson: JSON.stringify(config.sections),
+      rateLimitJson: JSON.stringify(config.rateLimit),
+    },
+    create: {
+      id: 'singleton',
+      feedLocked: config.feedLocked,
+      messagingLocked: config.messagingLocked,
+      sectionsJson: JSON.stringify(config.sections),
+      rateLimitJson: JSON.stringify(config.rateLimit),
+    },
+  });
 }
 
 export async function patchSectionControl(
@@ -183,6 +217,22 @@ export async function patchRateLimitConfig(update: Partial<RateLimitConfig>): Pr
     windowMs: Math.max(250, Math.min(60_000, Number(update.windowMs ?? current.rateLimit.windowMs))),
     mutatingOnly: typeof update.mutatingOnly === 'boolean' ? update.mutatingOnly : current.rateLimit.mutatingOnly,
   };
+  current.updatedAt = new Date().toISOString();
+  await saveAdminControlConfig(current);
+  return current;
+}
+
+export async function patchFeedLock(locked: boolean): Promise<AdminControlConfig> {
+  const current = await getAdminControlConfig();
+  current.feedLocked = locked;
+  current.updatedAt = new Date().toISOString();
+  await saveAdminControlConfig(current);
+  return current;
+}
+
+export async function patchMessagingLock(locked: boolean): Promise<AdminControlConfig> {
+  const current = await getAdminControlConfig();
+  current.messagingLocked = locked;
   current.updatedAt = new Date().toISOString();
   await saveAdminControlConfig(current);
   return current;

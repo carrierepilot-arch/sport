@@ -158,36 +158,55 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 
  const target = await prisma.user.findUnique({ where: { id } });
  if (!target) return NextResponse.json({ error: 'Utilisateur introuvable' }, { status: 404 });
- if (target.isAdmin) return NextResponse.json({ error: 'Impossible de supprimer un administrateur' }, { status: 400 });
+ // Only protect level-3 admins from deletion; level 1/2 admins can be deleted
+ if ((target.adminLevel ?? 0) >= 3) return NextResponse.json({ error: 'Impossible de supprimer un administrateur de niveau 3' }, { status: 400 });
 
- // Delete all related data then the user (cascading via Prisma relations)
- await prisma.$transaction([
- // Spots: null-out addedBy, remove regulars/favorites
- prisma.spot.updateMany({ where: { addedBy: id }, data: { addedBy: null } }),
- prisma.spotRegular.deleteMany({ where: { userId: id } }),
- prisma.spotFavorite.deleteMany({ where: { userId: id } }),
- // Challenges: null-out creator, remove completions
- prisma.challenge.updateMany({ where: { creatorId: id }, data: { creatorId: null } }),
- prisma.challengeCompletion.deleteMany({ where: { userId: id } }),
- // Performances: remove validations given by this user, then their performances (cascades own validations)
- prisma.performanceValidation.deleteMany({ where: { validatorId: id } }),
- prisma.performance.deleteMany({ where: { userId: id } }),
- // Groups: remove messages/members, then owned groups (cascade remaining)
- prisma.groupMessage.deleteMany({ where: { userId: id } }),
- prisma.groupMember.deleteMany({ where: { userId: id } }),
- prisma.group.deleteMany({ where: { ownerId: id } }),
- // API logs
- prisma.apiLog.deleteMany({ where: { userId: id } }),
- // Core user data
- prisma.badge.deleteMany({ where: { userId: id } }),
- prisma.activityLog.deleteMany({ where: { userId: id } }),
- prisma.userSession.deleteMany({ where: { userId: id } }),
- prisma.message.deleteMany({ where: { OR: [{ senderId: id }, { receiverId: id }] } }),
- prisma.friendRequest.deleteMany({ where: { OR: [{ senderId: id }, { receiverId: id }] } }),
- prisma.workoutSession.deleteMany({ where: { userId: id } }),
- prisma.workout.deleteMany({ where: { userId: id } }),
- prisma.user.delete({ where: { id } }),
+ // Collect owned resource IDs needed for cross-user cleanup (cannot be done inside batch transaction)
+ const [ownedWorkouts, ownedGroups] = await Promise.all([
+   prisma.workout.findMany({ where: { userId: id }, select: { id: true } }),
+   prisma.group.findMany({ where: { ownerId: id }, select: { id: true } }),
  ]);
+ const workoutIds = ownedWorkouts.map(w => w.id);
+ const ownedGroupIds = ownedGroups.map(g => g.id);
+
+ // Delete all related data then the user using an interactive transaction for safe ordering
+ await prisma.$transaction(async (tx) => {
+   // Spots
+   await tx.spot.updateMany({ where: { addedBy: id }, data: { addedBy: null } });
+   await tx.spotRegular.deleteMany({ where: { userId: id } });
+   await tx.spotFavorite.deleteMany({ where: { userId: id } });
+   // Challenges
+   await tx.challenge.updateMany({ where: { creatorId: id }, data: { creatorId: null } });
+   await tx.challengeCompletion.deleteMany({ where: { userId: id } });
+   // Performances: delete validations from this user as validator + validations on their performances
+   await tx.performanceValidation.deleteMany({ where: { validatorId: id } });
+   await tx.performanceValidation.deleteMany({ where: { performance: { userId: id } } });
+   await tx.performance.deleteMany({ where: { userId: id } });
+   // Groups: clean this user's messages/memberships in all groups
+   await tx.groupMessage.deleteMany({ where: { userId: id } });
+   await tx.groupMember.deleteMany({ where: { userId: id } });
+   // Clean remaining members/messages in groups owned by this user, then delete those groups
+   if (ownedGroupIds.length > 0) {
+     await tx.groupMessage.deleteMany({ where: { groupId: { in: ownedGroupIds } } });
+     await tx.groupMember.deleteMany({ where: { groupId: { in: ownedGroupIds } } });
+   }
+   await tx.group.deleteMany({ where: { ownerId: id } });
+   // Misc data
+   await tx.apiLog.deleteMany({ where: { userId: id } });
+   await tx.badge.deleteMany({ where: { userId: id } });
+   await tx.activityLog.deleteMany({ where: { userId: id } });
+   await tx.userSession.deleteMany({ where: { userId: id } });
+   await tx.message.deleteMany({ where: { OR: [{ senderId: id }, { receiverId: id }] } });
+   await tx.friendRequest.deleteMany({ where: { OR: [{ senderId: id }, { receiverId: id }] } });
+   // Workouts: delete all sessions referencing this user's workouts (from any user), then their sessions elsewhere
+   if (workoutIds.length > 0) {
+     await tx.workoutSession.deleteMany({ where: { workoutId: { in: workoutIds } } });
+   }
+   await tx.workoutSession.deleteMany({ where: { userId: id } });
+   await tx.workout.deleteMany({ where: { userId: id } });
+   // Finally delete the user
+   await tx.user.delete({ where: { id } });
+ });
 
  await logAdminAction(admin.userId, 'admin.user.delete', `Deleted user ${target.email} (${id})`);
 
